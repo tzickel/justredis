@@ -20,8 +20,19 @@ def encode(encoding='utf-8', errors='strict'):
 utf8_encode = encode()
 
 
+def parse_encoding(encoding):
+    if isinstance(encoding, str):
+        encoding = encode(encoding=encoding)
+    elif isinstance(encoding, (tuple, list)):
+        encoding = encode(*encoding)
+    elif isinstance(encoding, dict):
+        encoding = encode(**encoding)
+    return encoding
+
+
 class RedisRespEncoder:
-    def __init__(self, encoder=utf8_encode, cutoff_size=4096):
+    def __init__(self, encoder=utf8_encode, cutoff_size=4096, **kwargs):
+        encoder = parse_encoding(encoder)
         self._encoder = encoder
         self._cutoff_size = cutoff_size
         self._compressed_chunks = deque()
@@ -46,9 +57,12 @@ class RedisRespEncoder:
             self._uncompressed_chunks.append(data)
             self._uncompressed_length += data_length
 
-    def encode(self, *cmd):
+    def encode(self, *cmd, encoder=None):
         _add_data = self._add_data
-        encoder = self._encoder
+        if encoder is None:
+            encoder = self._encoder
+        else:
+            encoder = parse_encoding(encoder)
         _add_data(b'*%d\r\n' % len(cmd))
         for arg in cmd:
             arg = encoder(arg)

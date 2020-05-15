@@ -23,8 +23,8 @@ class SyncConnection:
                 connect_retry -= 1
                 if not connect_retry:
                     raise CommunicationError() from e
-        self._encoder = RedisRespEncoder()
-        self._decoder = RedisRespDecoder()
+        self._encoder = RedisRespEncoder(**kwargs)
+        self._decoder = RedisRespDecoder()#**kwargs)
         self._seen_eof = False
         self._push_mode = False
 
@@ -74,12 +74,12 @@ class SyncConnection:
     def closed(self):
         return self._socket == None
 
-    def _send(self, *cmd, multiple=False):
+    def _send(self, *cmd, multiple=False, encoder=None):
         if multiple:
             for _cmd in cmd:
-                self._encoder.encode(*_cmd)
+                self._encoder.encode(*_cmd, encoder=encoder)
         else:
-            self._encoder.encode(*cmd)
+            self._encoder.encode(*cmd, encoder=encoder)
         while True:
             data = self._encoder.extract()
             if data is None:
@@ -134,23 +134,23 @@ class SyncConnection:
             self._last_database = database
         # TODO meh detection
         if isinstance(cmd[0], (tuple, list)):
-            return self._commands(*cmd)
+            return self._commands(*cmd, encoder=encoder)
         else:
-            return self._command(*cmd)
+            return self._command(*cmd, encoder=encoder)
 
-    def _command(self, *cmd):
+    def _command(self, *cmd, encoder=None):
         if self._push_mode:
             raise Exception()
-        self._send(*cmd)
+        self._send(*cmd, encoder=encoder)
         res = self._recv()
         if isinstance(res, Error):
             raise res
         return res
 
-    def _commands(self, *cmds):
+    def _commands(self, *cmds, encoder=None):
         if self._push_mode:
             raise Exception()
-        self._send(*cmds, multiple=True)
+        self._send(*cmds, multiple=True, encoder=encoder)
         res = []
         found_errors = False
         for _ in range(len(cmds)):

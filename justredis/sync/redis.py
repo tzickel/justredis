@@ -2,6 +2,8 @@ from .connectionpool import SyncConnectionPool
 
 
 class SyncRedis:
+    # TODO docstring the kwargs
+    # TODO use from url with options
     def __init__(self, **kwargs):
         self._connection_pool = SyncConnectionPool(**kwargs)
 
@@ -25,7 +27,7 @@ class SyncRedis:
         self.close()
 
     def multi(self):
-        raise NotImplementedError()
+        return SyncMultiCommand(self)
 
     def watch(self, *keys):
         raise NotImplementedError()
@@ -36,14 +38,14 @@ class SyncRedis:
     def monitor(self):
         return SyncMonitor(self)
 
-    def database(self, db):
-        return SyncDatabase(self, db)
+    def database(self, database):
+        return SyncDatabase(self, database)
 
 
 class SyncDatabase:
-    def __init__(self, redis, db):
+    def __init__(self, redis, database):
         self._redis = redis
-        self._db = db
+        self._database = database
 
     def __del__(self):
         self.close()
@@ -52,7 +54,7 @@ class SyncDatabase:
         self._redis = None
 
     def __call__(self, *cmd, encoder=None, decoder=None):
-        return self._redis(*cmd, encoder=encoder, decoder=decoder, database=self._db)
+        return self._redis(*cmd, encoder=encoder, decoder=decoder, database=self._database)
 
     def __enter__(self):
         return self
@@ -61,21 +63,29 @@ class SyncDatabase:
         self.close()
 
     def multi(self):
-        raise NotImplementedError()
+        return SyncMultiCommand(self, self._database)
 
     def watch(self, *keys):
         raise NotImplementedError()
 
 
 class SyncMultiCommand:
-    def __init__(self, redis):
+    def __init__(self, redis, database=0):
         self._redis = redis
+        self._database = database
+        self._result = None
+
+    def __del__(self):
+        self.close()
+    
+    def close(self):
+        pass
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        pass
+        self.close()
 
     def __call__(self):
         pass

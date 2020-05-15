@@ -6,9 +6,9 @@ import time
 #    print(r('get', 'a'))
 
 #r = SyncRedis(resp_version=2, socket_factory='unix')
-r = SyncRedis(resp_version=2)
+r = SyncRedis(resp_version=2, encoder='ascii')
 
-print(r('set', 'a', 'b'))
+print(r('set', 'a', 'bשלום', encoder='utf8'))
 with r.database(1) as r1:
     print(r1('get', 'a'))
 print(r('get', 'a'))
