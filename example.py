@@ -27,7 +27,7 @@ with r.connection() as c:
     c('set', 'ac', a + 1)
     c('exec')
     print(a)
-
+r.close()
 #with r.monitor() as m:
     #for item in m:
         #print(item)

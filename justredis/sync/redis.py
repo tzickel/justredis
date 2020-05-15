@@ -40,7 +40,9 @@ class SyncRedis:
         self.close()
 
     def close(self):
-        self._connection_pool.close()
+        if self._connection_pool:
+            self._connection_pool.close()
+        self._connection_pool = None
 
     def __enter__(self):
         return self
@@ -58,15 +60,20 @@ class SyncRedis:
             self._connection_pool.release(conn)
 
     # TODO give an optional key later for specific server
-    # TODO document to not use this for monitor / pubsub / etc.. just for maybe multi which I can manage somehow...
-    # TODO what tod o about database number ?
-    # TODO disalo push commands on this instance !
+    # TODO disable and document not to use this for monitor / pubsub / other push commands
     @contextmanager
-    def connection(self):
+    def connection(self, _database=None):
         conn = self._connection_pool.take()
         try:
+            if _database is None:
+                _database = self._database
+            # TODO refactor this to a command @ connection
+            if conn._last_database != _database:
+                conn._command(b'SELECT', _database)
+                conn._last_database = _database
             yield conn
         finally:
+            # We need to clean up the connection back to a normal state.
             try:
                 conn._command(b'DISCARD')
             except Error:
@@ -103,14 +110,13 @@ class SyncDatabase:
     def __call__(self, *cmd):
         return self._redis(*cmd, _database=self._database)
 
-    #def multi(self):
-        #return SyncMultiCommand(self, self._database)
+    def connection(self):
+        return self._redis.connection(_database=self._database)
 
 
 class SyncPersistentConnection:
-    def __init__(self, redis, retries=3):
+    def __init__(self, redis):
         self._redis = redis
-        self._retries = retries
         self._conn = None
 
     def __del__(self):
@@ -120,6 +126,8 @@ class SyncPersistentConnection:
         self._disconnect()
         if self._conn:
             self._redis._connection_pool.release(self._conn)
+            self._redis = None
+            self._conn = None
 
     def __enter__(self):
         return self
@@ -139,7 +147,6 @@ class SyncPersistentConnection:
     def _disconnect(self):
         pass
 
-    # TODO retries
     def _check_connection(self):
         conn = self._conn
         if conn == None:
@@ -157,6 +164,7 @@ class SyncPersistentConnection:
         return self._conn.pushed_message(timeout)
 
 
+# TODO complete this
 class SyncPubSub(SyncPersistentConnection):
     def __init__(self, *args, **kwargs):
         super(SyncPubSub, self).__init__(*args, **kwargs)
