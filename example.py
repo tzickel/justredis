@@ -1,8 +1,18 @@
-from justredis import Redis
+from justredis import Redis, UnixDomainSocketWrapper
+import time
 
-r = Redis(resp_version=2)
-print(r('get', 'a'))
-print(r('set', 'a', 'c'))
+
+r = Redis(resp_version=2, socket_factory=UnixDomainSocketWrapper)
+#s = time.time()
+#for _ in range(100):
+#    r('set', 'a', 'b' * 100000)
+#    assert len(r('get', 'a')) == 100000
+#e = time.time()
+#print(e-s)
+#r.close()
+#print(r('get', 'a'))
+#print(r('set', 'a', 'c'))
+print(r(('get', 'a'), ('set', 'a', 'c')))
 
 #from connection import Connection
 

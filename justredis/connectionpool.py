@@ -11,7 +11,7 @@ class ConnectionPool:
         self._max_connections = max_connections
         self._wait_timeout = wait_timeout
 
-        self._limit = Sempahore(max_connections) if max_connections else None
+        self._limit = Semaphore(max_connections) if max_connections else None
         self._connections_available = deque()
         self._connections_in_use = set()
 

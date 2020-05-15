@@ -1,43 +1,19 @@
-import socket
+from collections import Iterable
+
 
 from .decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from .encoder import RedisRespEncoder
+from .sockets import SocketWrapper
 from .errors import CommunicationError
-
-
-# TODO keepalive
-class SocketWrapper:
-    def __init__(self, address, timeout):
-        self._buffer = bytearray(2**16)
-        self._view = memoryview(self._buffer)
-        self._socket = socket.create_connection(address, timeout)
-
-    def send(self, data):
-        self._socket.sendall(data)
-
-    def recv(self, timeout=False):
-        if timeout is not False:
-            old_timeout = self._socket.gettimeout()
-            self._socket.settimeout(timeout)
-            try:
-                r = self._socket.recv_into(self._buffer)
-            finally:
-                # TODO if this fails
-                self._socket.settimeout(old_timeout)
-        else:
-            r = self._socket.recv_into(self._buffer)
-        return self._view[:r]
 
 
 # TODO different encoder / decoder ?
 # TODO better ERROR result handling
 # TODO select database?
 class Connection:
-    def __init__(self, address=None, timeout=None, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper):
-        if address is None:
-            address = ('localhost', 6379)
+    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper, **kwargs):
         try:
-            self._socket = socket_factory(address, timeout)
+            self._socket = socket_factory(**kwargs)
         except Exception as e:
             raise CommunicationError() from e
         self._encoder = RedisRespEncoder()
@@ -89,8 +65,8 @@ class Connection:
 
     def _send(self, *cmd, multiple=False):
         if multiple:
-            for cmd in cmds:
-                self._encoder.encode(*cmd)
+            for _cmd in cmd:
+                self._encoder.encode(*_cmd)
         else:
             self._encoder.encode(*cmd)
         while True:
@@ -101,7 +77,7 @@ class Connection:
                 self._socket.send(data)
             except Exception as e:
                 self.close()
-                raise SocketIOError
+                raise CommunicationError() from e
 
     def _recv(self, timeout=False):
         while True:
@@ -138,9 +114,14 @@ class Connection:
         self._push_mode = False
 
     def __call__(self, *cmd):
-        return self.command(*cmd)
+        if not cmd:
+            raise Exception()
+        if isinstance(cmd[0], Iterable):
+            return self._commands(*cmd)
+        else:
+            return self._command(*cmd)
 
-    def command(self, *cmd):
+    def _command(self, *cmd):
         if self._push_mode:
             raise Exception()
         self._send(*cmd)
@@ -149,10 +130,10 @@ class Connection:
             raise res
         return res
 
-    def commands(self, *cmds):
+    def _commands(self, *cmds):
         if self._push_mode:
             raise Exception()
-        self._send_many(*cmds, True)
+        self._send(*cmds, multiple=True)
         res = []
         found_errors = False
         for _ in range(len(cmds)):
