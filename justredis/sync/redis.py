@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 from .connectionpool import SyncConnectionPool
+from ..decoder import Error
 from ..utils import parse_url
 
 
@@ -10,8 +11,28 @@ class SyncRedis:
         kwargs.update(parse_url(url))
         return cls(**kwargs)
 
-    # TODO docstring the kwargs
     def __init__(self, database=0, **kwargs):
+        # TODO docstring the kwargs
+        """
+            Possible arguments:
+            database (0): The default database number for this instance
+            decoder (bytes): By default strings are kept as bytes, 'unicode'
+            encoder
+            username
+            password
+            client_name
+            resp_version
+            socket_factory
+            connect_retry
+            buffersize
+            max_connections
+            wait_timeout
+            address
+            connect_timeout
+            socket_timeout
+            tcp_keepalive
+            tcp_nodelay
+        """
         self._database = database
         self._connection_pool = SyncConnectionPool(**kwargs)
 
@@ -39,13 +60,17 @@ class SyncRedis:
     # TODO give an optional key later for specific server
     # TODO document to not use this for monitor / pubsub / etc.. just for maybe multi which I can manage somehow...
     # TODO what tod o about database number ?
+    # TODO disalo push commands on this instance !
     @contextmanager
     def connection(self):
         conn = self._connection_pool.take()
         try:
             yield conn
         finally:
-            # TODO DISCARD !!!!
+            try:
+                conn._command(b'DISCARD')
+            except Error:
+                pass
             self._connection_pool.release(conn)
 
     def pubsub(self):

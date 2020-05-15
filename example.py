@@ -20,6 +20,14 @@ with r.database(1) as r1:
 print(r({'command': ('get', 'a'), 'decoder': 'utf8'}))
 print(r('get', 'a'))
 
+with r.connection() as c:
+    c('watch', 'ac')
+    a = int(c('get', 'ac') or 0)
+    c('multi')
+    c('set', 'ac', a + 1)
+    c('exec')
+    print(a)
+
 #with r.monitor() as m:
     #for item in m:
         #print(item)
