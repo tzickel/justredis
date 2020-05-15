@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from .connectionpool import SyncConnectionPool
 from ..utils import parse_url
 
@@ -34,11 +36,17 @@ class SyncRedis:
         finally:
             self._connection_pool.release(conn)
 
-    def multi(self):
-        return SyncMultiCommand(self, database=self._database)
-
-    def watch(self, *keys):
-        raise NotImplementedError()
+    # TODO give an optional key later for specific server
+    # TODO document to not use this for monitor / pubsub / etc.. just for maybe multi which I can manage somehow...
+    # TODO what tod o about database number ?
+    @contextmanager
+    def connection(self):
+        conn = self._connection_pool.take()
+        try:
+            yield conn
+        finally:
+            # TODO DISCARD !!!!
+            self._connection_pool.release(conn)
 
     def pubsub(self):
         return SyncPubSub(self)
@@ -61,42 +69,17 @@ class SyncDatabase:
     def close(self):
         self._redis = None
 
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *args):
+        self.close()
+
     def __call__(self, *cmd):
         return self._redis(*cmd, _database=self._database)
 
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, *args):
-        self.close()
-
-    def multi(self):
-        return SyncMultiCommand(self, self._database)
-
-    def watch(self, *keys):
-        raise NotImplementedError()
-
-
-class SyncMultiCommand:
-    def __init__(self, redis, database=0):
-        self._redis = redis
-        self._database = database
-        self._result = None
-
-    def __del__(self):
-        self.close()
-    
-    def close(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-    def __call__(self):
-        pass
+    #def multi(self):
+        #return SyncMultiCommand(self, self._database)
 
 
 class SyncPersistentConnection:
