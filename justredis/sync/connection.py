@@ -126,13 +126,16 @@ class SyncConnection:
     def no_more_push_command(self):
         self._push_mode = False
 
+    def set_database(self, database):
+        if database != self._last_database:
+            self._command(b'SELECT', database)
+            self._last_database = database
+
     # TODO if we see SELECT we should update it manually !
     def __call__(self, *cmd, database=0):
         if not cmd:
             raise Exception()
-        if self._last_database != database:
-            self._command(b'SELECT', database)
-            self._last_database = database
+        self.set_database(database)
         # TODO meh detection
         if isinstance(cmd[0], (tuple, list)):
             return self._commands(*cmd)

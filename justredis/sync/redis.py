@@ -67,10 +67,7 @@ class SyncRedis:
         try:
             if _database is None:
                 _database = self._database
-            # TODO refactor this to a command @ connection
-            if conn._last_database != _database:
-                conn._command(b'SELECT', _database)
-                conn._last_database = _database
+            conn.set_database(_database)
             yield conn
         finally:
             # We need to clean up the connection back to a normal state.
@@ -123,11 +120,11 @@ class SyncPersistentConnection:
         self.close()
     
     def close(self):
-        self._disconnect()
         if self._conn:
+            self._disconnect()
             self._redis._connection_pool.release(self._conn)
-            self._redis = None
             self._conn = None
+        self._redis = None
 
     def __enter__(self):
         return self
@@ -155,23 +152,55 @@ class SyncPersistentConnection:
             self._redis._connection_pool.release(conn)
             self._conn = self._redis._connection_pool.take()
         else:
-            return
-        # TODO this can throw
+            return True
+        # TODO this can throw, tough luck ?
         self._connect()
+        return False
 
     def next_message(self, timeout=False):
         self._check_connection()
-        return self._conn.pushed_message(timeout)
+        try:
+            return self._conn.pushed_message(timeout)
+        # TODO something better here ?
+        except ConnectionError:
+            self._check_connection()
+            return self._conn.pushed_message(timeout)
 
 
-# TODO complete this
+# TODO think better about disconnect in the middle senario
+# TODO encoding / decoding here ?
 class SyncPubSub(SyncPersistentConnection):
     def __init__(self, *args, **kwargs):
+        self._channels = set()
+        self._patterns = set()
         super(SyncPubSub, self).__init__(*args, **kwargs)
 
-    def subscribe(self, channel):
-        self._check_connection()
-        self._conn.push_command(b'SUBSCRIBE', channel)
+    def _connect(self):
+        if self._channels:
+            self._conn.push_command(b'SUBSCRIBE', *self._channels)
+        if self._patterns:
+            self._conn.push_command(b'PSUBSCRIBE', *self._patterns)
+
+    # We could do something smarter here, and unsubscribe from everything, but is this an often done command ?
+    def _disconnect(self):
+        if self._conn:
+            self._conn.close()
+
+    def subscribe(self, *channels):
+        self._channels.update(channels)
+        if not self._check_connection():
+            self._conn.push_command(b'SUBSCRIBE', *channels)
+
+    def psubscribe(self, *patterns):
+        self._patterns.update(patterns)
+        if not self._check_connection():
+            self._conn.push_command(b'PSUBSCRIBE', *patterns)
+
+    def unsubscribe(self, *channels):
+        raise NotImplementedError()
+
+    def punsubscribe(self, *patterns):
+        raise NotImplementedError()
 
 
 class SyncMonitor(SyncPersistentConnection):
