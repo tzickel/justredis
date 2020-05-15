@@ -1,3 +1,6 @@
+import socket
+
+
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
@@ -8,13 +11,18 @@ from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper
 # TODO better ERROR result handling
 # TODO select database?
 class SyncConnection:
-    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, **kwargs):
-        try:
-            if socket_factory == 'unix':
-                socket_factory = SyncUnixDomainSocketWrapper
-            self._socket = socket_factory(**kwargs)
-        except Exception as e:
-            raise CommunicationError() from e
+    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, connect_retry=2, **kwargs):
+        if socket_factory == 'unix':
+            socket_factory = SyncUnixDomainSocketWrapper
+        connect_retry += 1
+        while connect_retry:
+            try:
+                self._socket = socket_factory(**kwargs)
+                break
+            except Exception as e:
+                connect_retry -= 1
+                if not connect_retry:
+                    raise CommunicationError() from e
         self._encoder = RedisRespEncoder()
         self._decoder = RedisRespDecoder()
         self._seen_eof = False
@@ -90,6 +98,8 @@ class SyncConnection:
                 else:
                     try:
                         data = self._socket.recv(timeout)
+                    # TODO put this somewhere else
+                    # TODO this is wrong in conncetion pooling
                     except socket.timeout:
                         return None
                     except Exception as e:

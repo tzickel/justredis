@@ -1,5 +1,4 @@
 from collections import deque
-from itertools import chain
 
 
 def encode(encoding='utf-8', errors='strict'):

@@ -5,7 +5,16 @@ import time
 #with SyncRedis(resp_version=2) as r:
 #    print(r('get', 'a'))
 
-r = SyncRedis(resp_version=2, socket_factory='unix')
+#r = SyncRedis(resp_version=2, socket_factory='unix')
+r = SyncRedis(resp_version=2)
+
+print(r('set', 'a', 'b'))
+print(r('get', 'a'))
+
+#with r.monitor() as m:
+    #for item in m:
+        #print(item)
+
 #s = time.time()
 #for _ in range(100):
 #    r('set', 'a', 'b' * 100000)
@@ -13,7 +22,7 @@ r = SyncRedis(resp_version=2, socket_factory='unix')
 #e = time.time()
 #print(e-s)
 #r.close()
-print(r('get', 'a'))
+#print(r('get', 'a'))
 #print(r('set', 'a', 'c'))
 #print(r(('get', 'a'), ('set', 'a', 'c')))
 
