@@ -7,9 +7,7 @@ from ..errors import CommunicationError
 from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper
 
 
-# TODO different encoder / decoder ?
 # TODO better ERROR result handling
-# TODO select database?
 class SyncConnection:
     def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, connect_retry=2, **kwargs):
         if socket_factory == 'unix':
@@ -120,6 +118,7 @@ class SyncConnection:
         return self._recv(timeout)
 
     # TODO should have encoding as well
+    # TODO remove push_mode, handle it in a higher level ...
     def push_command(self, *cmd):
         self._push_mode = True
         self._send(*cmd)
@@ -127,7 +126,8 @@ class SyncConnection:
     def no_more_push_command(self):
         self._push_mode = False
 
-    def __call__(self, *cmd, encoder=None, decoder=None, database=0):
+    # TODO if we see SELECT we should update it manually !
+    def __call__(self, *cmd, database=0):
         if not cmd:
             raise Exception()
         if self._last_database != database:
@@ -135,22 +135,32 @@ class SyncConnection:
             self._last_database = database
         # TODO meh detection
         if isinstance(cmd[0], (tuple, list)):
-            return self._commands(*cmd, encoder=encoder, decoder=decoder)
+            return self._commands(*cmd)
         else:
-            return self._command(*cmd, encoder=encoder, decoder=decoder)
+            return self._command(*cmd)
 
-    def _command(self, *cmd, encoder=None, decoder=None):
+    # TODO on grabage encoding, we need to kill this connection and start a new one !!!
+    def _command(self, *cmd):
         if self._push_mode:
             raise Exception()
+        if isinstance(cmd[0], dict):
+            cmd = cmd[0]
+            encoder = cmd.get('encoder', None)
+            decoder = cmd.get('decoder', None)
+            cmd = cmd['command']
+        else:
+            encoder = None
+            decoder = None
         self._send(*cmd, encoder=encoder)
         res = self._recv(decoder=decoder)
         if isinstance(res, Error):
             raise res
         return res
 
-    def _commands(self, *cmds, encoder=None, decoder=None):
+    def _commands(self, *cmds):
         if self._push_mode:
             raise Exception()
+        # TODO handle dictionary of multiple encoding / decoding here :()
         self._send(*cmds, multiple=True, encoder=encoder)
         res = []
         found_errors = False

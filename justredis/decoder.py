@@ -446,6 +446,7 @@ class RedisResp2Decoder:
         self._buffer.append(data)
 
     def extract(self, just_data=None, decoder=None):
+        # TODO can exception happen should we finally ?
         tmp = None
         if decoder is not None:
             tmp = self._decoder

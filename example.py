@@ -9,10 +9,15 @@ import time
 #r = SyncRedis(resp_version=2, encoder='ascii', decoder='utf8')
 r = SyncRedis(resp_version=2, encoder='ascii')
 
-print(r('set', 'a', 'bשלום', encoder='utf8'))
+#with r.pubsub() as p:
+    #p.subscribe('test')
+    #for msg in p:
+        #print(msg)
+
+print(r({'command': ('set', 'a', 'bשלום'), 'encoder': 'utf8'}))
 with r.database(1) as r1:
     print(r1('get', 'a'))
-print(r('get', 'a', decoder='utf8'))
+print(r({'command': ('get', 'a'), 'decoder': 'utf8'}))
 print(r('get', 'a'))
 
 #with r.monitor() as m:

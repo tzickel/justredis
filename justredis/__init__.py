@@ -1,4 +1,6 @@
 from .sync.redis import SyncRedis
-#errors
+# TODO keep this in sync
+from .errors import *
 
-__all__ = 'SyncRedis'
+
+__all__ = 'SyncRedis', 'RedisError', 'CommunicationError', 'ConnectionPoolError'

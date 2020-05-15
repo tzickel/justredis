@@ -2,6 +2,9 @@ import socket
 import sys
 
 
+# TODO code a SyncSslSocketWrapper as well
+
+
 platform = ''
 if sys.platform.startswith('linux'):
     platform = 'linux'
@@ -26,10 +29,11 @@ class SyncSocketWrapper:
         sock = socket.create_connection(address, connect_timeout)
         sock.settimeout(socket_timeout)
 
-        if tcp_nodelay:
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        else:
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 0)
+        if tcp_nodelay is not None:
+            if tcp_nodelay:
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            else:
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 0)
         if tcp_keepalive:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             if platform == 'linux':

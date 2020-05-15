@@ -1,10 +1,16 @@
 from .connectionpool import SyncConnectionPool
+from ..utils import parse_url
 
 
 class SyncRedis:
+    @classmethod
+    def from_url(cls, url, **kwargs):
+        kwargs.update(parse_url(url))
+        return cls(**kwargs)
+
     # TODO docstring the kwargs
-    # TODO use from url with options
-    def __init__(self, **kwargs):
+    def __init__(self, database=0, **kwargs):
+        self._database = database
         self._connection_pool = SyncConnectionPool(**kwargs)
 
     def __del__(self):
@@ -13,27 +19,29 @@ class SyncRedis:
     def close(self):
         self._connection_pool.close()
 
-    def __call__(self, *cmd, encoder=None, decoder=None, database=0):
-        conn = self._connection_pool.take()
-        try:
-            return conn(*cmd, encoder=encoder, decoder=decoder, database=database)
-        finally:
-            self._connection_pool.release(conn)
-
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
         self.close()
 
+    def __call__(self, *cmd, _database=None):
+        conn = self._connection_pool.take()
+        try:
+            if _database is None:
+                _database = self._database
+            return conn(*cmd, database=_database)
+        finally:
+            self._connection_pool.release(conn)
+
     def multi(self):
-        return SyncMultiCommand(self)
+        return SyncMultiCommand(self, database=self._database)
 
     def watch(self, *keys):
         raise NotImplementedError()
 
     def pubsub(self):
-        raise NotImplementedError()
+        return SyncPubSub(self)
 
     def monitor(self):
         return SyncMonitor(self)
@@ -53,8 +61,8 @@ class SyncDatabase:
     def close(self):
         self._redis = None
 
-    def __call__(self, *cmd, encoder=None, decoder=None):
-        return self._redis(*cmd, encoder=encoder, decoder=decoder, database=self._database)
+    def __call__(self, *cmd):
+        return self._redis(*cmd, _database=self._database)
 
     def __enter__(self):
         return self
@@ -105,6 +113,18 @@ class SyncPersistentConnection:
         if self._conn:
             self._redis._connection_pool.release(self._conn)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next_message()
+
     def _connect(self):
         pass
 
@@ -129,23 +149,20 @@ class SyncPersistentConnection:
         return self._conn.pushed_message(timeout)
 
 
+class SyncPubSub(SyncPersistentConnection):
+    def __init__(self, *args, **kwargs):
+        super(SyncPubSub, self).__init__(*args, **kwargs)
+
+    def subscribe(self, channel):
+        self._check_connection()
+        self._conn.push_command(b'SUBSCRIBE', channel)
+
+
 class SyncMonitor(SyncPersistentConnection):
     def _connect(self):
-        self._conn.push_command('MONITOR')
+        self._conn.push_command(b'MONITOR')
 
     def _disconnect(self):
         if self._conn:
             # We can't recover a MONITOR connection?
             self._conn.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        return self.next_message()
