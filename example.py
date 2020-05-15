@@ -9,6 +9,8 @@ import time
 r = SyncRedis(resp_version=2)
 
 print(r('set', 'a', 'b'))
+with r.database(1) as r1:
+    print(r1('get', 'a'))
 print(r('get', 'a'))
 
 #with r.monitor() as m:

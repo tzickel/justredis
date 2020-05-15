@@ -38,7 +38,7 @@ class SyncConnectionPool:
                     self._limit.release()
         except IndexError:
             if self._limit is not None and not self._limit.acquire(True, self._wait_timeout):
-                raise ConnectionPoolError('Could not aquire an connection form the pool')
+                raise ConnectionPoolError('Could not acquire an connection form the pool')
             try:
                 conn = SyncConnection(**self._connection_settings)
             except Exception:

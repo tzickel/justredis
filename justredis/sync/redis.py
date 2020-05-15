@@ -11,10 +11,10 @@ class SyncRedis:
     def close(self):
         self._connection_pool.close()
 
-    def __call__(self, *cmd, _database=0, _encoder=None, _decoder=None):
+    def __call__(self, *cmd, encoder=None, decoder=None, database=0):
         conn = self._connection_pool.take()
         try:
-            return conn(*cmd)
+            return conn(*cmd, encoder=encoder, decoder=decoder, database=database)
         finally:
             self._connection_pool.release(conn)
 
@@ -25,16 +25,46 @@ class SyncRedis:
         self.close()
 
     def multi(self):
-        return SyncMultiCommand(self)
+        raise NotImplementedError()
 
     def watch(self, *keys):
-        pass
+        raise NotImplementedError()
 
     def pubsub(self):
-        pass
+        raise NotImplementedError()
 
     def monitor(self):
         return SyncMonitor(self)
+
+    def database(self, db):
+        return SyncDatabase(self, db)
+
+
+class SyncDatabase:
+    def __init__(self, redis, db):
+        self._redis = redis
+        self._db = db
+
+    def __del__(self):
+        self.close()
+    
+    def close(self):
+        self._redis = None
+
+    def __call__(self, *cmd, encoder=None, decoder=None):
+        return self._redis(*cmd, encoder=encoder, decoder=decoder, database=self._db)
+
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *args):
+        self.close()
+
+    def multi(self):
+        raise NotImplementedError()
+
+    def watch(self, *keys):
+        raise NotImplementedError()
 
 
 class SyncMultiCommand:

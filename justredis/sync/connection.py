@@ -28,6 +28,8 @@ class SyncConnection:
         self._seen_eof = False
         self._push_mode = False
 
+        self._last_database = 0
+
         connected = False
         if resp_version not in (-1, 2, 3):
             raise Exception('Unsupported RESP protocol version %s' % resp_version)
@@ -124,9 +126,12 @@ class SyncConnection:
     def no_more_push_command(self):
         self._push_mode = False
 
-    def __call__(self, *cmd):
+    def __call__(self, *cmd, encoder=None, decoder=None, database=0):
         if not cmd:
             raise Exception()
+        if self._last_database != database:
+            self._command(b'SELECT', database)
+            self._last_database = database
         # TODO meh detection
         if isinstance(cmd[0], (tuple, list)):
             return self._commands(*cmd)
