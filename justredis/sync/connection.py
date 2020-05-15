@@ -1,7 +1,7 @@
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
-from .sockets import SyncSocketWrapper
 from ..errors import CommunicationError
+from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper
 
 
 # TODO different encoder / decoder ?
@@ -10,6 +10,8 @@ from ..errors import CommunicationError
 class SyncConnection:
     def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, **kwargs):
         try:
+            if socket_factory == 'unix':
+                socket_factory = SyncUnixDomainSocketWrapper
             self._socket = socket_factory(**kwargs)
         except Exception as e:
             raise CommunicationError() from e

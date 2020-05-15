@@ -1,11 +1,11 @@
-from justredis import SyncRedis, SyncUnixDomainSocketWrapper
+from justredis import SyncRedis
 import time
 
 
-with SyncRedis(resp_version=3) as r:
-    print(r('get', 'a'))
+#with SyncRedis(resp_version=2) as r:
+#    print(r('get', 'a'))
 
-#r = Redis(resp_version=2, socket_factory=UnixDomainSocketWrapper)
+r = SyncRedis(resp_version=2, socket_factory='unix')
 #s = time.time()
 #for _ in range(100):
 #    r('set', 'a', 'b' * 100000)
@@ -13,7 +13,7 @@ with SyncRedis(resp_version=3) as r:
 #e = time.time()
 #print(e-s)
 #r.close()
-#print(r('get', 'a'))
+print(r('get', 'a'))
 #print(r('set', 'a', 'c'))
 #print(r(('get', 'a'), ('set', 'a', 'c')))
 
