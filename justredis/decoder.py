@@ -1,7 +1,6 @@
-# Notice in Python 2 bytearray implementation is less efficient, luckily it's EOL
+# Python 2 bytearray implementation is less efficient, luckily it's EOL
 class Buffer:
-    def __init__(self, as_bytes=True):
-        self._as_bytes = as_bytes
+    def __init__(self):
         self._buffer = bytearray()
     
     def append(self, data):
@@ -22,12 +21,12 @@ class Buffer:
             return None
         ret = self._buffer[:idx]
         del self._buffer[:idx + 2]
-        return bytes(ret) if self._as_bytes else ret
+        return ret
 
     def take(self, nbytes):
         ret = self._buffer[:nbytes]
         del self._buffer[:nbytes]
-        return bytes(ret) if self._as_bytes else ret
+        return ret
 
     def skip(self, nbytes):
         del self._buffer[:nbytes]
@@ -113,9 +112,10 @@ def strip_metadata(data):
 
 
 class RedisRespDecoder:
-    def __init__(self, strip_metadata=False):
+    def __init__(self, strip_metadata=False, decoder=None, **kwargs):
         self._buffer = Buffer()
         self._strip_metadata = strip_metadata
+        self._decoder = decoder or bytes
         self._result = iter(self._extract_generator())
 
     def feed(self, data):
@@ -426,16 +426,33 @@ class RedisRespDecoder:
                 yield msg
 
 
+def parse_decoding(decoding):
+    if isinstance(decoding, str):
+        decoding = lambda x, decoding=decoding: x.decode(encoding=decoding)
+    elif isinstance(decoding, (tuple, list)):
+        decoding = lambda x, decoding=decoding: x.decode(*decoding)
+    elif isinstance(decoding, dict):
+        decoding = lambda x, decoding=deconding: x.decode(**decoding)
+    return decoding
+
+
 class RedisResp2Decoder:
-    def __init__(self):
+    def __init__(self, decoder=None, **kwargs):
         self._buffer = Buffer()
+        self._decoder = parse_decoding(decoder) or bytes
         self._result = iter(self._extract_generator())
 
     def feed(self, data):
         self._buffer.append(data)
 
-    def extract(self, just_data=None):
+    def extract(self, just_data=None, decoder=None):
+        tmp = None
+        if decoder is not None:
+            tmp = self._decoder
+            self._decoder = parse_decoding(decoder)
         res = next(self._result)
+        if tmp is not None:
+            self._decoder = tmp
         return res
 
     # TODO on error clear buffer and abort
@@ -466,13 +483,14 @@ class RedisResp2Decoder:
             # Simple string
             if buffer.skip_if_startswith(b'+'):
                 while True:
-                    msg = buffer.takeline()
+                    msg = self._decoder(buffer.takeline())
                     if msg is not None:
                         break
                     yield _need_more_data
             # Simple error
             elif buffer.skip_if_startswith(b'-'):
                 while True:
+                    # TODO decode to string as well ?
                     msg = buffer.takeline()
                     if msg is not None:
                         break
@@ -503,7 +521,7 @@ class RedisResp2Decoder:
                         if len(buffer) >= length + 2:
                             break
                         yield _need_more_data
-                    msg = buffer.take(length)
+                    msg = self._decoder(buffer.take(length))
                     buffer.skip(2)
             # Array
             elif buffer.skip_if_startswith(b'*'):

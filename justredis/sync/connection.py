@@ -24,7 +24,7 @@ class SyncConnection:
                 if not connect_retry:
                     raise CommunicationError() from e
         self._encoder = RedisRespEncoder(**kwargs)
-        self._decoder = RedisRespDecoder()#**kwargs)
+        self._decoder = RedisRespDecoder(**kwargs)
         self._seen_eof = False
         self._push_mode = False
 
@@ -50,7 +50,7 @@ class SyncConnection:
                 if resp_version == 3:
                     raise Exception('Server does not support RESP3 protocol')
         if not connected:
-            self._decoder = RedisResp2Decoder()
+            self._decoder = RedisResp2Decoder(**kwargs)
             if password:
                 if username:
                     self._command(b'AUTH', username, password)
@@ -90,9 +90,9 @@ class SyncConnection:
                 self.close()
                 raise CommunicationError() from e
 
-    def _recv(self, timeout=False):
+    def _recv(self, timeout=False, decoder=None):
         while True:
-            res = self._decoder.extract()
+            res = self._decoder.extract(decoder=decoder)
             if res == need_more_data:
                 if self._seen_eof:
                     self.close()
@@ -119,6 +119,7 @@ class SyncConnection:
             raise Exception()
         return self._recv(timeout)
 
+    # TODO should have encoding as well
     def push_command(self, *cmd):
         self._push_mode = True
         self._send(*cmd)
@@ -134,27 +135,27 @@ class SyncConnection:
             self._last_database = database
         # TODO meh detection
         if isinstance(cmd[0], (tuple, list)):
-            return self._commands(*cmd, encoder=encoder)
+            return self._commands(*cmd, encoder=encoder, decoder=decoder)
         else:
-            return self._command(*cmd, encoder=encoder)
+            return self._command(*cmd, encoder=encoder, decoder=decoder)
 
-    def _command(self, *cmd, encoder=None):
+    def _command(self, *cmd, encoder=None, decoder=None):
         if self._push_mode:
             raise Exception()
         self._send(*cmd, encoder=encoder)
-        res = self._recv()
+        res = self._recv(decoder=decoder)
         if isinstance(res, Error):
             raise res
         return res
 
-    def _commands(self, *cmds, encoder=None):
+    def _commands(self, *cmds, encoder=None, decoder=None):
         if self._push_mode:
             raise Exception()
         self._send(*cmds, multiple=True, encoder=encoder)
         res = []
         found_errors = False
         for _ in range(len(cmds)):
-            result = self._recv()
+            result = self._recv(decoder=decoder)
             if isinstance(result, Error):
                 found_errors = True
             res.append(result)
