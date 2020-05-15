@@ -1,4 +1,5 @@
-from .redis import Redis
-from .sockets import UnixDomainSocketWrapper
+from .sync.redis import SyncRedis
+from .sync.sockets import SyncUnixDomainSocketWrapper
 
-__all__ = 'Redis', 'UnixDomainSocketWrapper'
+
+__all__ = 'SyncRedis', 'SyncUnixDomainSocketWrapper'

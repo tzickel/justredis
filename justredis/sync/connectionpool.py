@@ -2,14 +2,15 @@ from collections import deque
 from threading import Semaphore
 
 
-from .connection import Connection
+from .connection import SyncConnection
+from ..errors import ConnectionPoolError
 
 
-class ConnectionPool:
+class SyncConnectionPool:
     def __init__(self, max_connections=None, wait_timeout=None, **connection_settings):
-        self._connection_settings = connection_settings
         self._max_connections = max_connections
         self._wait_timeout = wait_timeout
+        self._connection_settings = connection_settings
 
         self._limit = Semaphore(max_connections) if max_connections else None
         self._connections_available = deque()
@@ -18,14 +19,16 @@ class ConnectionPool:
     def __del__(self):
         self.close()
     
+    # This won't close connections which are in use currently
+    # TODO add a force option ?
     def close(self):
         for connection in self._connections_available:
             connection.close()
-        self._connection_settings = self._max_connections = self._wait_timeout = self._limit = self._connections_available = self._connections_in_use = None
+        self._connections_available.clear()
+        self._connections_in_use.clear()
+        self._limit = Semaphore(self._max_connections) if self._max_connections else None
         
     def take(self):
-        if self._connections_available is None:
-            raise Exception('ConnectionPool already closed')
         try:
             while True:
                 conn = self._connections_available.popleft()
@@ -35,9 +38,9 @@ class ConnectionPool:
                     self._limit.release()
         except IndexError:
             if self._limit is not None and not self._limit.acquire(True, self._wait_timeout):
-                raise Exception('Could not aquire an connection form the pool')
+                raise ConnectionPoolError('Could not aquire an connection form the pool')
             try:
-                conn = Connection(**self._connection_settings)
+                conn = SyncConnection(**self._connection_settings)
             except Exception:
                 if self._limit is not None:
                     self._limit.release()
@@ -46,11 +49,12 @@ class ConnectionPool:
         return conn
 
     def release(self, conn):
-        # If we are closed, close this pending connection
-        if self._connections_available is None:
+        try:
+            self._connections_in_use.remove(conn)
+        # If this fails, it's a connection from a previous cycle, don't reuse it
+        except KeyError:
             conn.close()
             return
-        self._connections_in_use.remove(conn)
         if not conn.closed():
             self._connections_available.append(conn)
         elif self._limit is not None:

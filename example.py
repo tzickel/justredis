@@ -1,8 +1,11 @@
-from justredis import Redis, UnixDomainSocketWrapper
+from justredis import SyncRedis, SyncUnixDomainSocketWrapper
 import time
 
 
-r = Redis(resp_version=2, socket_factory=UnixDomainSocketWrapper)
+with SyncRedis(resp_version=3) as r:
+    print(r('get', 'a'))
+
+#r = Redis(resp_version=2, socket_factory=UnixDomainSocketWrapper)
 #s = time.time()
 #for _ in range(100):
 #    r('set', 'a', 'b' * 100000)
@@ -12,7 +15,7 @@ r = Redis(resp_version=2, socket_factory=UnixDomainSocketWrapper)
 #r.close()
 #print(r('get', 'a'))
 #print(r('set', 'a', 'c'))
-print(r(('get', 'a'), ('set', 'a', 'c')))
+#print(r(('get', 'a'), ('set', 'a', 'c')))
 
 #from connection import Connection
 

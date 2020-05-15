@@ -1,17 +1,14 @@
-from collections import Iterable
-
-
-from .decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
-from .encoder import RedisRespEncoder
-from .sockets import SocketWrapper
-from .errors import CommunicationError
+from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
+from ..encoder import RedisRespEncoder
+from .sockets import SyncSocketWrapper
+from ..errors import CommunicationError
 
 
 # TODO different encoder / decoder ?
 # TODO better ERROR result handling
 # TODO select database?
-class Connection:
-    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper, **kwargs):
+class SyncConnection:
+    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, **kwargs):
         try:
             self._socket = socket_factory(**kwargs)
         except Exception as e:
@@ -22,6 +19,8 @@ class Connection:
         self._push_mode = False
 
         connected = False
+        if resp_version not in (-1, 2, 3):
+            raise Exception('Unsupported RESP protocol version %s' % resp_version)
         if resp_version != 2:
             args = [b'HELLO', b'3']
             if password:
@@ -32,7 +31,7 @@ class Connection:
             if client_name:
                 args.extend((b'SETNAME', client_name))
             try:
-                res = self.command(*args)
+                res = self._command(*args)
                 connected = True
             except Error:
                 # TODO not true, can be wrong password...
@@ -42,11 +41,11 @@ class Connection:
             self._decoder = RedisResp2Decoder()
             if password:
                 if username:
-                    self.command(b'AUTH', username, password)
+                    self._command(b'AUTH', username, password)
                 else:
-                    self.command(b'AUTH', password)
+                    self._command(b'AUTH', password)
             if client_name:
-                self.command(b'CLIENT', b'SETNAME', client_name)
+                self._command(b'CLIENT', b'SETNAME', client_name)
 
     def __del__(self):
         self.close()
@@ -116,7 +115,8 @@ class Connection:
     def __call__(self, *cmd):
         if not cmd:
             raise Exception()
-        if isinstance(cmd[0], Iterable):
+        # TODO meh detection
+        if isinstance(cmd[0], (tuple, list)):
             return self._commands(*cmd)
         else:
             return self._command(*cmd)

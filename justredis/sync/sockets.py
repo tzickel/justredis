@@ -2,7 +2,7 @@ import socket
 
 
 # TODO keepalive
-class SocketWrapper:
+class SyncSocketWrapper:
     def __init__(self, address=None, timeout=None, keepalive=None, **kwargs):
         self._buffer = bytearray(2**16)
         self._view = memoryview(self._buffer)
@@ -32,7 +32,8 @@ class SocketWrapper:
         return self._view[:r]
 
 
-class UnixDomainSocketWrapper(SocketWrapper):
+# TODO can we support keepalive ? if not, change constructor
+class SyncUnixDomainSocketWrapper(SyncSocketWrapper):
     def _create(self, address, timeout):
         if address == None:
             address = ('/tmp/redis.sock')

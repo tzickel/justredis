@@ -4,3 +4,7 @@ class RedisError(Exception):
 
 class CommunicationError(RedisError):
     pass
+
+
+class ConnectionPoolError(RedisError):
+    pass
