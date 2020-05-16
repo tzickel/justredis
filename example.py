@@ -7,7 +7,8 @@ import time
 
 #r = SyncRedis(resp_version=2, socket_factory='unix')
 #r = SyncRedis(resp_version=2, encoder='ascii', decoder='utf8')
-r = SyncRedis(resp_version=2, encoder='ascii', pool_factory='pool')
+#r = SyncRedis(resp_version=2, encoder='ascii', pool_factory='pool')
+r = SyncRedis(resp_version=3, encoder='ascii', pool_factory='pool')
 
 #with r.pubsub() as p:
     #p.subscribe('test')
@@ -21,7 +22,7 @@ print(r({'command': ('get', 'a'), 'decoder': 'utf8'}))
 print(r('get', 'a'))
 
 with r.connection('ac') as c:
-    print(c.peername())
+    #print(c.peername())
     c('watch', 'ac')
     a = int(c('get', 'ac') or 0)
     c('multi')

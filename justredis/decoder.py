@@ -100,36 +100,25 @@ class Push(Result):
 need_more_data = NeedMoreData()
 
 
-def strip_metadata(data):
-    if isinstance(data, (Array, Set)):
-        data = [strip_metadata(x) for x in data.data]
-    elif isinstance(data, Map):
-        data = {x: strip_metadata(y) for x, y in data.data.items()}
-    else:
-        if not isinstance(data, (Error, BigNumber)):
-            data = data.data
-    return data
-
-
 class RedisRespDecoder:
-    def __init__(self, strip_metadata=False, decoder=None, **kwargs):
+    def __init__(self, decoder=None, **kwargs):
         self._buffer = Buffer()
-        self._strip_metadata = strip_metadata
-        self._decoder = decoder or bytes
+        self._decoder = parse_decoding(decoder) or bytes
         self._result = iter(self._extract_generator())
 
     def feed(self, data):
         self._buffer.append(data)
 
-    def extract(self, just_data=None):
+    def extract(self, decoder=None):
+        # TODO can exception happen should we finally ?
+        tmp = None
+        if decoder is not None:
+            tmp = self._decoder
+            self._decoder = parse_decoding(decoder)
         res = next(self._result)
-        if res == need_more_data:
-            return res
-        # TODO do this better ?
-        if just_data or (just_data is None and self._strip_metadata):
-            return strip_metadata(res)
-        else:
-            return res
+        if tmp is not None:
+            self._decoder = tmp
+        return res
 
     # TODO on error clear buffer and abort
     def _extract_generator(self):
@@ -192,7 +181,7 @@ class RedisRespDecoder:
             if buffer.skip_if_startswith(b'+'):
                 msg_type = String
                 while True:
-                    msg = buffer.takeline()
+                    msg = self._decoder(buffer.takeline())
                     if msg is not None:
                         break
                     yield _need_more_data
@@ -200,7 +189,7 @@ class RedisRespDecoder:
             elif buffer.skip_if_startswith(b'-'):
                 msg_type = Error
                 while True:
-                    msg = buffer.takeline()
+                    msg = self._decoder(buffer.takeline())
                     if msg is not None:
                         break
                     yield _need_more_data
@@ -242,7 +231,7 @@ class RedisRespDecoder:
                             yield _need_more_data
                         chunks.append(buffer.take(chunk_size))
                         buffer.skip(2)
-                    msg = b''.join(chunks)
+                    msg = self._decoder(b''.join(chunks))
                 else:
                     length = int(length)
                     # Legacy RESP2 support
@@ -253,7 +242,7 @@ class RedisRespDecoder:
                             if len(buffer) >= length + 2:
                                 break
                             yield _need_more_data
-                        msg = buffer.take(length)
+                        msg = self._decoder(buffer.take(length))
                         buffer.skip(2)
             # Array
             elif buffer.skip_if_startswith(b'*'):
@@ -343,7 +332,7 @@ class RedisRespDecoder:
                         if len(buffer) >= length + 2:
                             break
                         yield _need_more_data
-                    msg = buffer.take(length)
+                    msg = self._decoder(buffer.take(length))
                     buffer.skip(2)
             # Big number
             elif buffer.skip_if_startswith(b'('):
@@ -445,7 +434,7 @@ class RedisResp2Decoder:
     def feed(self, data):
         self._buffer.append(data)
 
-    def extract(self, just_data=None, decoder=None):
+    def extract(self, decoder=None):
         # TODO can exception happen should we finally ?
         tmp = None
         if decoder is not None:
