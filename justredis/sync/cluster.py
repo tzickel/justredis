@@ -18,6 +18,7 @@ def calc_hashslot(key):
 
 # TODO think about multithreading here...
 # TODO can I lazaly check if there is a cluster ??
+# TODO recursion bug in take inside update slots and friends if underliyin gconnection pool allows only for 1 connection, pass an optional connection
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:
@@ -172,7 +173,7 @@ class SyncClusterConnectionPool:
 
     @contextmanager
     def connection(self, key, _database=0):
-        if self._clustered == False:
+        if self._clustered == False :
             conn = self.take()
         else:
             conn = self.take_by_key(key)

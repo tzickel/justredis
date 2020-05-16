@@ -4,7 +4,11 @@ import socket
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
+from ..utils import get_command_name
 from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper
+
+
+not_allowed_commands = b'MONITOR', b'SUBSCRIBE', b'PSUBSCRIBE', b'UNSUBSCRIBE', b'PUNSUBSCRIBE'
 
 
 # TODO better ERROR result handling
@@ -24,7 +28,7 @@ class SyncConnection:
         self._encoder = RedisRespEncoder(**kwargs)
         self._decoder = RedisRespDecoder(**kwargs)
         self._seen_eof = False
-        self._push_mode = False
+        self._peername = self._socket.peername()
 
         self._last_database = 0
 
@@ -74,7 +78,7 @@ class SyncConnection:
         return self._socket == None
 
     def peername(self):
-        return self._socket.peername()
+        return self._peername
 
     def _send(self, *cmd, multiple=False, encoder=None):
         if multiple:
@@ -116,19 +120,12 @@ class SyncConnection:
                 continue
             return res
 
-    def pushed_message(self, timeout=False):
-        if not self._push_mode:
-            raise Exception()
-        return self._recv(timeout)
+    def pushed_message(self, timeout=False, decoder=None):
+        return self._recv(timeout, decoder)
 
     # TODO should have encoding as well
-    # TODO remove push_mode, handle it in a higher level ...
     def push_command(self, *cmd):
-        self._push_mode = True
         self._send(*cmd)
-
-    def no_more_push_command(self):
-        self._push_mode = False
 
     def set_database(self, database):
         if database != self._last_database:
@@ -148,8 +145,8 @@ class SyncConnection:
 
     # TODO on grabage encoding, we need to kill this connection and start a new one !!!
     def _command(self, *cmd):
-        if self._push_mode:
-            raise Exception()
+        if get_command_name(cmd) in not_allowed_commands:
+            raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
         if isinstance(cmd[0], dict):
             cmd = cmd[0]
             encoder = cmd.get('encoder', None)
@@ -165,8 +162,6 @@ class SyncConnection:
         return res
 
     def _commands(self, *cmds):
-        if self._push_mode:
-            raise Exception()
         # TODO handle dictionary of multiple encoding / decoding here :()
         self._send(*cmds, multiple=True, encoder=encoder)
         res = []

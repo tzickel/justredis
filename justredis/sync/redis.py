@@ -17,6 +17,8 @@ class SyncRedis:
             Possible arguments:
             database (0): The default database number for this instance
             pool_factory
+
+            For any pool:
             decoder (bytes): By default strings are kept as bytes, 'unicode'
             encoder
             username
@@ -58,7 +60,7 @@ class SyncRedis:
             _database = self._database
         return self._connection_pool(*cmd, _database=_database)
 
-    # TODO disable and document not to use this for monitor / pubsub / other push commands ( should be a flag in connection)
+    # Do not use this connection for push commands (monitor / pubsub/ etc...)
     def connection(self, key, _database=None):
         if _database is None:
             _database = self._database
@@ -99,8 +101,9 @@ class SyncDatabase:
 
 
 class SyncPersistentConnection:
-    def __init__(self, redis):
+    def __init__(self, redis, address=None):
         self._redis = redis
+        self._address = address
         self._conn = None
 
     def __del__(self):
@@ -131,32 +134,32 @@ class SyncPersistentConnection:
     def _disconnect(self):
         pass
 
-    # TODO cluster support
+    def _check_next_message(self):
+        pass
+
+    # returns False when a new connection was created
     def _check_connection(self):
         conn = self._conn
-        if conn == None:
-            self._conn = self._redis._connection_pool.take()
+        if conn is None:
+            self._conn = self._redis._connection_pool.take(self._address)
         elif conn.closed():
             self._redis._connection_pool.release(conn)
-            self._conn = self._redis._connection_pool.take()
+            self._conn = self._redis._connection_pool.take(self._address)
         else:
             return True
-        # TODO this can throw, tough luck ?
         self._connect()
         return False
 
-    def next_message(self, timeout=False):
+    # We don't hide here a connection failure, because the client should be aware that a temporary disconnection has happened
+    # TODO maybe notify connection failure here, as an None result, or non exceptional ?
+    def next_message(self, timeout=False, decoder=None):
         self._check_connection()
-        try:
-            return self._conn.pushed_message(timeout)
-        # TODO something better here ?
-        except ConnectionError:
-            self._check_connection()
-            return self._conn.pushed_message(timeout)
+        self._check_next_message()
+        return self._conn.pushed_message(timeout, decoder)
 
 
-# TODO think better about disconnect in the middle senario
-# TODO encoding / decoding here ?
+# TODO should I provide optional different encoding here for channel/pattern names ?
+# If a disconnection happens, you can recall the command to continue trying
 class SyncPubSub(SyncPersistentConnection):
     def __init__(self, *args, **kwargs):
         self._channels = set()
@@ -169,26 +172,36 @@ class SyncPubSub(SyncPersistentConnection):
         if self._patterns:
             self._conn.push_command(b'PSUBSCRIBE', *self._patterns)
 
-    # We could do something smarter here, and unsubscribe from everything, but is this an often done command ?
     def _disconnect(self):
         if self._conn:
+            # We could do something smarter here, and unsubscribe from everything, but is this an often done command ?
             self._conn.close()
+
+    def _check_next_message(self):
+        if not self._channels and not self._patterns:
+            raise Exception('Not listening to anything')
 
     def subscribe(self, *channels):
         self._channels.update(channels)
-        if not self._check_connection():
+        if self._check_connection():
             self._conn.push_command(b'SUBSCRIBE', *channels)
 
     def psubscribe(self, *patterns):
         self._patterns.update(patterns)
-        if not self._check_connection():
+        if self._check_connection():
             self._conn.push_command(b'PSUBSCRIBE', *patterns)
 
     def unsubscribe(self, *channels):
-        raise NotImplementedError()
+        channels_to_remove = self._channels & set(channels)
+        self._channels -= channels_to_remove
+        if self._check_connection():
+            self._conn.push_command(b'UNSUBSCRIBE', *channels_to_remove)
 
     def punsubscribe(self, *patterns):
-        raise NotImplementedError()
+        patterns_to_remove = self._patterns & set(patterns)
+        self._patterns -= patterns_to_remove
+        if self._check_connection():
+            self._conn.push_command(b'PUNSUBSCRIBE', *patterns_to_remove)
 
 
 class SyncMonitor(SyncPersistentConnection):
@@ -197,5 +210,5 @@ class SyncMonitor(SyncPersistentConnection):
 
     def _disconnect(self):
         if self._conn:
-            # We can't recover a MONITOR connection?
+            # We can't recover a MONITOR connection, so close the connection
             self._conn.close()

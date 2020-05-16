@@ -29,8 +29,9 @@ class SyncConnectionPool:
         self._connections_available.clear()
         self._connections_in_use.clear()
         self._limit = Semaphore(self._max_connections) if self._max_connections else None
-        
-    def take(self):
+
+    # TODO if address is set, throw an exception ?
+    def take(self, address=None):
         try:
             while True:
                 conn = self._connections_available.popleft()

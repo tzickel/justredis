@@ -23,6 +23,7 @@ print(r({'command': ('get', 'a'), 'decoder': 'utf8'}))
 print(r('get', 'a'))
 
 with r.connection('ac') as c:
+    #c('MONITOR')
     #print(c.peername())
     c('watch', 'ac')
     a = int(c('get', 'ac') or 0)
@@ -30,7 +31,14 @@ with r.connection('ac') as c:
     c('set', 'ac', a + 1)
     c('exec')
     print(a)
-r.close()
+#r.close()
+
+with r.pubsub() as p:
+    p.subscribe(b'hi')
+    while True:
+        print(p.next_message(decoder='utf8'))
+    #for msg in p:
+        #print(msg)
 #with r.monitor() as m:
     #for item in m:
         #print(item)

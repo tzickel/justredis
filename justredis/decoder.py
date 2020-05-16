@@ -121,6 +121,7 @@ class RedisRespDecoder:
         return res
 
     # TODO on error clear buffer and abort
+    # TODO more work can be done on result deduplication
     def _extract_generator(self):
         buffer = self._buffer
         array_stack = []

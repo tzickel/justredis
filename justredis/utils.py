@@ -21,3 +21,17 @@ def parse_url(url):
         res['password'] = result.password
 
     return res
+
+
+def get_command_name(cmd):
+    if isinstance(cmd[0], dict):
+        cmd = cmd[0]['command']
+    cmd = cmd[0]
+    cmd = cmd.upper()
+    if isinstance(cmd, str):
+        cmd = cmd.encode()
+    return cmd
+
+
+def is_multiple_commands(cmd):
+    return True
