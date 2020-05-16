@@ -15,10 +15,9 @@ class SyncRedis:
         # TODO docstring the kwargs
         """
             Possible arguments:
-            database (0): The default database number for this instance
-            pool_factory
+            database (0): The default redis database number (SELECT) for this instance
+            pool_factory ('auto'): 
 
-            For any pool:
             decoder (bytes): By default strings are kept as bytes, 'unicode'
             encoder
             username
@@ -28,17 +27,28 @@ class SyncRedis:
             socket_factory
             connect_retry
             buffersize
+            For any pool:
+
+            addresses
+
+            # For all connection pools
             max_connections
             wait_timeout
+            
+            # For all sockets
             address
             connect_timeout
             socket_timeout
+
+            # For TCP based sockets
             tcp_keepalive
             tcp_nodelay
         """
         self._database = database
         if pool_factory == 'pool':
             pool_factory = SyncConnectionPool
+        elif pool_factory == 'auto':
+            pool_factory = SyncClusterConnectionPool
         self._connection_pool = pool_factory(**kwargs)
 
     def __del__(self):
@@ -151,14 +161,14 @@ class SyncPersistentConnection:
         return False
 
     # We don't hide here a connection failure, because the client should be aware that a temporary disconnection has happened
-    # TODO maybe notify connection failure here, as an None result, or non exceptional ?
+    # TODO (api) maybe notify connection failure here, as an None result, or non exceptional ?
     def next_message(self, timeout=False, decoder=None):
         self._check_connection()
         self._check_next_message()
         return self._conn.pushed_message(timeout, decoder)
 
 
-# TODO should I provide optional different encoding here for channel/pattern names ?
+# TODO (api) should I provide optional different encoding here for channel/pattern names ?
 # If a disconnection happens, you can recall the command to continue trying
 class SyncPubSub(SyncPersistentConnection):
     def __init__(self, *args, **kwargs):

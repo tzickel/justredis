@@ -1,6 +1,9 @@
 from collections import deque
 
 
+# TODO (api) should I wrap the ValueError in a RedisError ?
+
+
 def encode(encoding='utf-8', errors='strict'):
     def encode_with_encoding(inp, encoding=encoding, errors=errors):
         if isinstance(inp, (bytes, bytearray, memoryview)):
@@ -30,11 +33,11 @@ def parse_encoding(encoding):
     elif isinstance(encoding, dict):
         return encode(**encoding)
     else:
-        raise Exception('Invalid encoding')
+        raise ValueError('Invalid encoding')
 
 
 class RedisRespEncoder:
-    def __init__(self, encoder=None, cutoff_size=4096, **kwargs):
+    def __init__(self, encoder=None, cutoff_size=6000, **kwargs):
         self._encoder = parse_encoding(encoder)
         self._cutoff_size = cutoff_size
         self._compressed_chunks = deque()

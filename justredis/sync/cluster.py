@@ -18,11 +18,15 @@ def calc_hashslot(key):
 
 # TODO think about multithreading here...
 # TODO can I lazaly check if there is a cluster ??
-# TODO recursion bug in take inside update slots and friends if underliyin gconnection pool allows only for 1 connection, pass an optional connection
+# TODO recursion bug in take inside update slots and friends if underliyin gconnection pool allows only for 1 connection, pass an optional connection (maybe not an issue, because we do it, before we take one , but maybe not always)
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:
-            addresses = (('localhost', 6379), )
+            address = kwargs.get('address')
+            if address:
+                addresses = (address, )
+            else:
+                addresses = (('localhost', 6379), )
         self._initial_addresses = addresses
         self._settings = kwargs
         self._connections = {}
@@ -167,6 +171,7 @@ class SyncClusterConnectionPool:
         else:
             conn = self.take_by_cmd(*cmd)
         try:
+            # TODO handle MOVED error here
             return conn(*cmd, database=_database)
         finally:
             self.release(conn)
@@ -179,6 +184,7 @@ class SyncClusterConnectionPool:
             conn = self.take_by_key(key)
         try:
             conn.set_database(_database)
+            # TODO handle MOVED error here
             yield conn
         finally:
             # We need to clean up the connection back to a normal state.

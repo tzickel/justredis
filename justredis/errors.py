@@ -8,3 +8,7 @@ class CommunicationError(RedisError):
 
 class ConnectionPoolError(RedisError):
     pass
+
+
+class ProtocolError(RedisError):
+    pass

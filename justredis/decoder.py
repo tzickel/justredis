@@ -1,3 +1,6 @@
+from .errors import ProtocolError
+
+
 # Python 2 bytearray implementation is less efficient, luckily it's EOL
 class Buffer:
     def __init__(self):
@@ -30,10 +33,6 @@ class Buffer:
 
     def skip(self, nbytes):
         del self._buffer[:nbytes]
-
-
-class ProtocolError(Exception):
-    pass
 
 
 class NeedMoreData:
@@ -102,15 +101,15 @@ need_more_data = NeedMoreData()
 
 class RedisRespDecoder:
     def __init__(self, decoder=None, **kwargs):
-        self._buffer = Buffer()
         self._decoder = parse_decoding(decoder) or bytes
+        self._buffer = Buffer()
         self._result = iter(self._extract_generator())
 
     def feed(self, data):
         self._buffer.append(data)
 
     def extract(self, decoder=None):
-        # TODO can exception happen should we finally ?
+        # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
         tmp = None
         if decoder is not None:
             tmp = self._decoder
