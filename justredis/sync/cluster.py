@@ -7,8 +7,7 @@ from .connectionpool import SyncConnectionPool
 from ..decoder import Error
 
 
-# Cluster hash calculation
-def calc_hash(key):
+def calc_hashslot(key):
     s = key.find(b'{')
     if s != -1:
         e = key.find(b'}')
@@ -22,7 +21,8 @@ def calc_hash(key):
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:
-            addresses = (('localhost', 6379))
+            addresses = (('localhost', 6379), )
+        self._initial_addresses = addresses
         self._settings = kwargs
         self._connections = {}
         self._endpoints = []
@@ -77,27 +77,79 @@ class SyncClusterConnectionPool:
         conn = self.take(address)
         return conn
 
+    def _get_index_for_command(self, cmd):
+        # commands are ascii, yes ? some commands can be larger than cmd[0] for index ? meh, let's be optimistic for now
+        if isinstance(cmd, dict):
+            cmd = cmd['command']
+        command = bytes(cmd[0], 'ascii').upper()
+        index = self._command_cache.get(command, -1)
+        if index != -1:
+            return index
+        conn = self.take()
+        try:
+            command_info = conn(b'COMMAND', b'INFO', command)
+        finally:
+            self.release(conn)
+        command_info = command_info[0]
+        if command_info:
+            index = command_info[3]
+        else:
+            index = 0
+        self._command_cache[command] = index
+        # TODO map unknown to None
+        return index
+
+    def _address_pool(self, address):
+        pool = self._connections.get(address)
+        if pool is None:
+            with self._lock:
+                pool = self._connections.get(address)
+                if pool is None:
+                    pool = SyncConnectionPool(address=address, **self._settings)
+                    self._connections[address] = pool
+        return pool
+
     # TODO we need to handle when last_connection points to a member of the pool that isn't valid anymore..
+    # TODO fix this..
     def take(self, address=None):
         #if not address and self._last_connection and self._last_connection.
         if address:
-            pool = self._connections.get(address)
-            if pool is None:
-                with self._lock:
-                    pool = self._connections.get(address)
-                    if pool is None:
-                        pool = SyncConnectionPool(address=address, **self._settings)
-                        self._connections[address] = pool
-            return pool.take()
+            return self._address_pool(address).take()
+        elif self._last_connection:
+            # TODO check health, if bad, update slots
+            return self._last_connection.take()
         else:
-            raise NotImplementedError()
+            endpoints = self._endpoints
+            if not endpoints:
+                endpoints = self._initial_addresses
+            for address in endpoints:
+                pool = self._address_pool(address)
+                self._last_connection = pool
+                break
+        return self._last_connection.take()
 
     def take_by_key(self, key):
-        hash = calc_hash(key)
-        return self._connection_by_hashslot(hash)
+        hashslot = calc_hashslot(key)
+        return self._connection_by_hashslot(hashslot)
 
     def take_by_cmd(self, *cmd):
-        raise NotImplementedError()
+        index = None
+        # TODO meh detection (refactor into utils?)
+        if isinstance(cmd[0], (tuple, list)):
+            for command in cmd:
+                index = self._get_index_for_command(*command)
+                if index is not None:
+                #TODO fix wrong
+                    break
+        else:
+            index = self._get_index_for_command(*cmd)
+        if index is None:
+            return self.take()
+        # TODO WRONG AND LAME
+        if isinstance(cmd[0], dict):
+            cmd = cmd[0]['command']
+        hashslot = calc_hashslot(cmd[index].encode())
+        return self._connection_by_hashslot(hashslot)
 
     def release(self, conn):
         address = conn.peername()

@@ -8,7 +8,8 @@ import time
 #r = SyncRedis(resp_version=2, socket_factory='unix')
 #r = SyncRedis(resp_version=2, encoder='ascii', decoder='utf8')
 #r = SyncRedis(resp_version=2, encoder='ascii', pool_factory='pool')
-r = SyncRedis(resp_version=3, encoder='ascii', pool_factory='pool')
+#r = SyncRedis(resp_version=3, encoder='ascii', pool_factory='pool')
+r = SyncRedis(resp_version=2, encoder='ascii')
 
 #with r.pubsub() as p:
     #p.subscribe('test')
