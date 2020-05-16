@@ -69,8 +69,12 @@ class SyncConnection:
         self._encoder = None
         self._decoder = None
 
+    # TODO better check ?
     def closed(self):
         return self._socket == None
+
+    def peername(self):
+        return self._socket.peername()
 
     def _send(self, *cmd, multiple=False, encoder=None):
         if multiple:

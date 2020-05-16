@@ -1,6 +1,5 @@
-from contextlib import contextmanager
-
 from .connectionpool import SyncConnectionPool
+from .cluster import SyncClusterConnectionPool
 from ..decoder import Error
 from ..utils import parse_url
 
@@ -8,14 +7,16 @@ from ..utils import parse_url
 class SyncRedis:
     @classmethod
     def from_url(cls, url, **kwargs):
-        kwargs.update(parse_url(url))
-        return cls(**kwargs)
+        res = parse_url(url)
+        res.update(kwargs)
+        return cls(**res)
 
-    def __init__(self, database=0, **kwargs):
+    def __init__(self, database=0, pool_factory=SyncClusterConnectionPool, **kwargs):
         # TODO docstring the kwargs
         """
             Possible arguments:
             database (0): The default database number for this instance
+            pool_factory
             decoder (bytes): By default strings are kept as bytes, 'unicode'
             encoder
             username
@@ -34,7 +35,9 @@ class SyncRedis:
             tcp_nodelay
         """
         self._database = database
-        self._connection_pool = SyncConnectionPool(**kwargs)
+        if pool_factory == 'pool':
+            pool_factory = SyncConnectionPool
+        self._connection_pool = pool_factory(**kwargs)
 
     def __del__(self):
         self.close()
@@ -51,30 +54,15 @@ class SyncRedis:
         self.close()
 
     def __call__(self, *cmd, _database=None):
-        conn = self._connection_pool.take()
-        try:
-            if _database is None:
-                _database = self._database
-            return conn(*cmd, database=_database)
-        finally:
-            self._connection_pool.release(conn)
+        if _database is None:
+            _database = self._database
+        return self._connection_pool(*cmd, _database=_database)
 
-    # TODO disable and document not to use this for monitor / pubsub / other push commands
-    @contextmanager
+    # TODO disable and document not to use this for monitor / pubsub / other push commands ( should be a flag in connection)
     def connection(self, key, _database=None):
-        conn = self._connection_pool.take()
-        try:
-            if _database is None:
-                _database = self._database
-            conn.set_database(_database)
-            yield conn
-        finally:
-            # We need to clean up the connection back to a normal state.
-            try:
-                conn._command(b'DISCARD')
-            except Error:
-                pass
-            self._connection_pool.release(conn)
+        if _database is None:
+            _database = self._database
+        return self._connection_pool.connection(key, _database)
 
     def pubsub(self):
         return SyncPubSub(self)
@@ -85,8 +73,6 @@ class SyncRedis:
     def database(self, database):
         return SyncDatabase(self, database)
 
-    def _get_connection_for_cmd(*cmd):
-        pass
 
 class SyncDatabase:
     def __init__(self, redis, database):
@@ -108,8 +94,8 @@ class SyncDatabase:
     def __call__(self, *cmd):
         return self._redis(*cmd, _database=self._database)
 
-    def connection(self):
-        return self._redis.connection(_database=self._database)
+    def connection(self, key):
+        return self._redis.connection(key, _database=self._database)
 
 
 class SyncPersistentConnection:
@@ -145,6 +131,7 @@ class SyncPersistentConnection:
     def _disconnect(self):
         pass
 
+    # TODO cluster support
     def _check_connection(self):
         conn = self._conn
         if conn == None:

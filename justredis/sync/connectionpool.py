@@ -1,9 +1,11 @@
 from collections import deque
+from contextlib import contextmanager
 from threading import Semaphore
 
 
 from .connection import SyncConnection
 from ..errors import ConnectionPoolError
+from ..decoder import Error
 
 
 class SyncConnectionPool:
@@ -59,3 +61,24 @@ class SyncConnectionPool:
             self._connections_available.append(conn)
         elif self._limit is not None:
             self._limit.release()
+
+    def __call__(self, *cmd, _database=0):
+        conn = self.take()
+        try:
+            return conn(*cmd, database=_database)
+        finally:
+            self.release(conn)
+
+    @contextmanager
+    def connection(self, key, _database=0):
+        conn = self.take()
+        try:
+            conn.set_database(_database)
+            yield conn
+        finally:
+            # We need to clean up the connection back to a normal state.
+            try:
+                conn._command(b'DISCARD')
+            except Error:
+                pass
+            self.release(conn)
