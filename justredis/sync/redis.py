@@ -59,10 +59,9 @@ class SyncRedis:
         finally:
             self._connection_pool.release(conn)
 
-    # TODO give an optional key later for specific server
     # TODO disable and document not to use this for monitor / pubsub / other push commands
     @contextmanager
-    def connection(self, _database=None):
+    def connection(self, key, _database=None):
         conn = self._connection_pool.take()
         try:
             if _database is None:
@@ -86,6 +85,8 @@ class SyncRedis:
     def database(self, database):
         return SyncDatabase(self, database)
 
+    def _get_connection_for_cmd(*cmd):
+        pass
 
 class SyncDatabase:
     def __init__(self, redis, database):
