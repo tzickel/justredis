@@ -70,7 +70,8 @@ class SyncRedis:
             _database = self._database
         return self._connection_pool(*cmd, _database=_database)
 
-    # Do not use this connection for push commands (monitor / pubsub/ etc...)
+    # Do not use this connection for push commands (monitor / pubsub / etc...)
+    # Do use this for transaction commands (watch / multi / exec / discard)
     def connection(self, key, _database=None):
         if _database is None:
             _database = self._database

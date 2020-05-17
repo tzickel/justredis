@@ -33,9 +33,10 @@ def parse_encoding(encoding):
     elif isinstance(encoding, dict):
         return encode(**encoding)
     else:
-        raise ValueError('Invalid encoding')
+        raise ValueError('Invalid encoding: %r' % encoding)
 
 
+# TODO (misc) add close for pypy
 class RedisRespEncoder:
     def __init__(self, encoder=None, cutoff_size=6000, **kwargs):
         self._encoder = parse_encoding(encoder)

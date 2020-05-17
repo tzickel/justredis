@@ -1,8 +1,6 @@
 import socket
 import sys
-
-
-# TODO code a SyncSslSocketWrapper as well
+import ssl
 
 
 platform = ''
@@ -24,7 +22,7 @@ class SyncSocketWrapper:
         self._socket.close()
 
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=None, **kwargs):
-        if address == None:
+        if address is None:
             address = ('localhost', 6379)
         sock = socket.create_connection(address, connect_timeout)
         sock.settimeout(socket_timeout)
@@ -70,9 +68,22 @@ class SyncSocketWrapper:
 
 class SyncUnixDomainSocketWrapper(SyncSocketWrapper):
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, **kwargs):
-        if address == None:
+        if address is None:
             address = '/tmp/redis.sock'
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.settimeout(connect_timeout)
         self._socket.connect(address)
         self._socket.settimeout(socket_timeout)
+
+
+# TODO Older python's might not have recv_into and I'll need to implment this from scratch
+# TODO how do cluster hostname work with SSL ?
+# TODO does closing this also close the socket itself ?
+class SyncSslSocketWrapper(SyncSocketWrapper):
+    def _create(self, address=None, ssl_context=None, **kwargs):
+        super(SyncSslSocketWrapper, self).__init__(address=address, **kwargs)
+        if address is None:
+            address = ('localhost', 6379)
+        if ssl_context is None:
+            ssl_context = ssl.create_default_context()
+        self._socket = ssl_context.wrap_socket(self._socket, server_hostname=address[0])

@@ -5,17 +5,25 @@ from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
 from ..utils import get_command_name
-from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper
+from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper, SyncSslSocketWrapper
 
 
 not_allowed_commands = b'MONITOR', b'SUBSCRIBE', b'PSUBSCRIBE', b'UNSUBSCRIBE', b'PUNSUBSCRIBE'
 
 
-# TODO better ERROR result handling
+class TimeoutError:
+    pass
+
+
+timeout_error = TimeoutError()
+
+
 class SyncConnection:
     def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, connect_retry=2, **kwargs):
         if socket_factory == 'unix':
             socket_factory = SyncUnixDomainSocketWrapper
+        elif socket_factory == 'ssl':
+            socket_factory = SyncSslSocketWrapper
         connect_retry += 1
         while connect_retry:
             try:
@@ -45,12 +53,17 @@ class SyncConnection:
             if client_name:
                 args.extend((b'SETNAME', client_name))
             try:
-                res = self._command(*args)
+                # TODO do something with the result ?
+                self._command(*args)
                 connected = True
-            except Error:
-                # TODO not true, can be wrong password...
-                if resp_version == 3:
-                    raise Exception('Server does not support RESP3 protocol')
+            except Error as e:
+                # TODO encoding (guess we should always be string here ?)
+                # This is to seperate an login error from the server not supporting RESP3
+                if e.args[0].startswith(b'ERR'):
+                    if resp_version == 3:
+                        raise Exception('Server does not support RESP3 protocol')
+                else:
+                    raise
         if not connected:
             self._decoder = RedisResp2Decoder(**kwargs)
             if password:
@@ -75,7 +88,7 @@ class SyncConnection:
 
     # TODO better check ?
     def closed(self):
-        return self._socket == None
+        return self._socket is None
 
     def peername(self):
         return self._peername
@@ -97,33 +110,35 @@ class SyncConnection:
                 raise CommunicationError() from e
 
     def _recv(self, timeout=False, decoder=None):
-        while True:
-            res = self._decoder.extract(decoder=decoder)
-            if res == need_more_data:
-                if self._seen_eof:
-                    self.close()
-                    raise CommunicationError() from EOFError('Connection reached EOF')
-                else:
-                    try:
-                        data = self._socket.recv(timeout)
-                    # TODO put this somewhere else
-                    # TODO this is wrong in conncetion pooling
-                    except socket.timeout:
-                        return None
-                    except Exception as e:
+        try:
+            while True:
+                res = self._decoder.extract(decoder=decoder)
+                if res == need_more_data:
+                    if self._seen_eof:
                         self.close()
-                        raise CommunicationError() from e
-                    if data == b'':
-                        self._seen_eof = True
+                        raise EOFError('Connection reached EOF')
                     else:
-                        self._decoder.feed(data)
-                continue
-            return res
+                        data = self._socket.recv(timeout)
+                        if data == b'':
+                            self._seen_eof = True
+                        else:
+                            self._decoder.feed(data)
+                    continue
+                return res
+        except socket.timeout:
+            # TODO handle this in connection pooling, to close the connection as well, but not in pushed
+            return timeout_error
+        except Exception as e:
+            self.close()
+            raise CommunicationError() from e
 
     def pushed_message(self, timeout=False, decoder=None):
-        return self._recv(timeout, decoder)
+        res = self._recv(timeout, decoder)
+        if res == timeout_error:
+            return None
+        return res
 
-    # TODO should have encoding as well
+    # TODO (api) should have encoding as well ?
     def push_command(self, *cmd):
         self._send(*cmd)
 
@@ -157,6 +172,7 @@ class SyncConnection:
             decoder = None
         self._send(*cmd, encoder=encoder)
         res = self._recv(decoder=decoder)
+        # TODO close connection on timeout error
         if isinstance(res, Error):
             raise res
         return res
@@ -168,6 +184,7 @@ class SyncConnection:
         found_errors = False
         for _ in range(len(cmds)):
             result = self._recv(decoder=decoder)
+            # TODO close connection on timeout error
             if isinstance(result, Error):
                 found_errors = True
             res.append(result)

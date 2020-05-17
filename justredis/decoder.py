@@ -1,6 +1,9 @@
 from .errors import ProtocolError
 
 
+# TODO (misc) We can add helpfull error messages on which part the parsing failed, should we do that ?
+
+
 # Python 2 bytearray implementation is less efficient, luckily it's EOL
 class Buffer:
     def __init__(self):
@@ -99,6 +102,20 @@ class Push(Result):
 need_more_data = NeedMoreData()
 
 
+def parse_decoding(decoding):
+    if decoding is None:
+        return bytes
+    elif isinstance(decoding, str):
+        return lambda x, decoding=decoding: x.decode(encoding=decoding)
+    elif isinstance(decoding, (tuple, list)):
+        return lambda x, decoding=decoding: x.decode(*decoding)
+    elif isinstance(decoding, dict):
+        return lambda x, decoding=deconding: x.decode(**decoding)
+    else:
+        raise ValueError('Invalid decoding: %r' % decoding)
+
+
+# TODO (misc) add close for pypy
 class RedisRespDecoder:
     def __init__(self, decoder=None, **kwargs):
         self._decoder = parse_decoding(decoder) or bytes
@@ -108,8 +125,10 @@ class RedisRespDecoder:
     def feed(self, data):
         self._buffer.append(data)
 
+    # If you plan on handling both PUSH messages and normal messages on the same connection, specifing a custom decoder here till be problematic
     def extract(self, decoder=None):
         # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
+        # Because there is PUSH replies, the decoder can be mixed, but in our code PUSH channels happen in a different connection
         tmp = None
         if decoder is not None:
             tmp = self._decoder
@@ -119,13 +138,12 @@ class RedisRespDecoder:
             self._decoder = tmp
         return res
 
-    # TODO on error clear buffer and abort
-    # TODO more work can be done on result deduplication
+    # TODO (misc) we can remove lots of code duplication here
+    # Once an error happens here, the decoding will stop
     def _extract_generator(self):
         buffer = self._buffer
         array_stack = []
         last_array = None
-        # TODO this works wrong....
         last_attribute = None
         _need_more_data = need_more_data
         while True:
@@ -141,18 +159,18 @@ class RedisRespDecoder:
                 # Result is an map
                 elif last_array[2] == 1:
                     msg_type = Map
-                    protocol_error = 'Could not parse Map type result'
                     i = iter(last_array[1])
-                    msg = dict([(bytes(y), next(i)) for y in i])
+                    # TODO (misc) is this the best way to deal with y ?
+                    msg = dict([(bytes(y) if y.__hash__ is None else y, next(i)) for y in i])
                 # Result is an set
                 elif last_array[2] == 2:
                     msg_type = Set
                     msg = set(last_array[1])
                 # Result is an attribute
                 elif last_array[2] == 3:
-                    protocol_error = 'Could not parse Attribute type result'
                     i = iter(last_array[1])
-                    last_attribute = dict([(bytes(y), next(i)) for y in i])
+                    # TODO (misc) is this the best way to deal with y ?
+                    last_attribute = dict([(bytes(y) if y.__hash__ is None else y, next(i)) for y in i])
                 # Result is an push
                 elif last_array[2] == 4:
                     msg_type = Push
@@ -201,7 +219,6 @@ class RedisRespDecoder:
                     if msg is not None:
                         break
                     yield _need_more_data
-                protocol_error = 'Could not parse integer'
                 msg = int(msg)
             # Blob string and Verbatim string
             elif buffer.skip_if_startswith(b'$') or buffer.skip_if_startswith(b'='):
@@ -265,7 +282,7 @@ class RedisRespDecoder:
                     last_attribute = None
                     continue
             # Set
-            elif buffer.skip_if_startswith(b'-'):
+            elif buffer.skip_if_startswith(b'~'):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
@@ -415,16 +432,7 @@ class RedisRespDecoder:
                 yield msg
 
 
-def parse_decoding(decoding):
-    if isinstance(decoding, str):
-        decoding = lambda x, decoding=decoding: x.decode(encoding=decoding)
-    elif isinstance(decoding, (tuple, list)):
-        decoding = lambda x, decoding=decoding: x.decode(*decoding)
-    elif isinstance(decoding, dict):
-        decoding = lambda x, decoding=deconding: x.decode(**decoding)
-    return decoding
-
-
+# TODO (misc) add close for pypy 
 class RedisResp2Decoder:
     def __init__(self, decoder=None, **kwargs):
         self._buffer = Buffer()
@@ -435,7 +443,7 @@ class RedisResp2Decoder:
         self._buffer.append(data)
 
     def extract(self, decoder=None):
-        # TODO can exception happen should we finally ?
+        # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
         tmp = None
         if decoder is not None:
             tmp = self._decoder
@@ -445,7 +453,6 @@ class RedisResp2Decoder:
             self._decoder = tmp
         return res
 
-    # TODO on error clear buffer and abort
     def _extract_generator(self):
         buffer = self._buffer
         array_stack = []
@@ -493,7 +500,6 @@ class RedisResp2Decoder:
                     if msg is not None:
                         break
                     yield _need_more_data
-                protocol_error = 'Could not parse integer'
                 msg = int(msg)
             # Blob string
             elif buffer.skip_if_startswith(b'$'):
