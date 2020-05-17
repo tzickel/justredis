@@ -35,3 +35,6 @@ def redis6_with_blah_passwd():
 def redis5_with_blah_passwd():
     for item in redis('redis:5', extraparams='--requirepass blah'):
         yield item
+
+
+redis_latest = redis6
