@@ -33,5 +33,9 @@ def get_command_name(cmd):
     return cmd
 
 
-def is_multiple_commands(cmd):
-    return True
+# TODO (misc) can we do this better ?
+def is_multiple_commands(*cmd):
+    if isinstance(cmd[0], (tuple, list)):
+        return True
+    else:
+        return False

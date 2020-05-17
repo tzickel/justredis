@@ -16,8 +16,11 @@ def calc_hashslot(key):
     return crc_hqx(key, 0) % 16384
 
 
-# TODO think about multithreading here...
-# TODO can I lazaly check if there is a cluster ??
+# TODO (misc) I think I covered the multithreading sensetive parts, make sure
+# TODO (misc) should I lazely check if there is a cluster ?
+# TODO (misc) add ASKING
+
+
 # TODO recursion bug in take inside update slots and friends if underliyin gconnection pool allows only for 1 connection, pass an optional connection (maybe not an issue, because we do it, before we take one , but maybe not always)
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
@@ -44,6 +47,7 @@ class SyncClusterConnectionPool:
         pass
 
     # TODO add hints protection
+    # TODO (misc) add a hints option when there is a moved
     def _update_slots(self):
         if self._clustered is False:
             return

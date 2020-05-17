@@ -4,14 +4,14 @@ import socket
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
-from ..utils import get_command_name
+from ..utils import get_command_name, is_multiple_commands
 from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper, SyncSslSocketWrapper
 
 
 not_allowed_commands = b'MONITOR', b'SUBSCRIBE', b'PSUBSCRIBE', b'UNSUBSCRIBE', b'PUNSUBSCRIBE'
 
 
-class TimeoutError:
+class TimeoutError(Exception):
     pass
 
 
@@ -53,11 +53,11 @@ class SyncConnection:
             if client_name:
                 args.extend((b'SETNAME', client_name))
             try:
-                # TODO do something with the result ?
+                # TODO (misc) do something with the result ?
                 self._command(*args)
                 connected = True
             except Error as e:
-                # TODO encoding (guess we should always be string here ?)
+                # TODO (misc) what to do about error encoding ?
                 # This is to seperate an login error from the server not supporting RESP3
                 if e.args[0].startswith(b'ERR'):
                     if resp_version == 3:
@@ -86,7 +86,7 @@ class SyncConnection:
         self._encoder = None
         self._decoder = None
 
-    # TODO better check ?
+    # TODO (misc) better check ? (maybe it's closed, but the socket doesn't know it yet..., will be known the next time though)
     def closed(self):
         return self._socket is None
 
@@ -94,21 +94,26 @@ class SyncConnection:
         return self._peername
 
     def _send(self, *cmd, multiple=False, encoder=None):
-        if multiple:
-            for _cmd in cmd:
-                self._encoder.encode(*_cmd, encoder=encoder)
-        else:
-            self._encoder.encode(*cmd, encoder=encoder)
-        while True:
-            data = self._encoder.extract()
-            if data is None:
-                break
-            try:
-                self._socket.send(data)
-            except Exception as e:
-                self.close()
-                raise CommunicationError() from e
+        try:
+            if multiple:
+                for _cmd in cmd:
+                    self._encoder.encode(*_cmd, encoder=encoder)
+            else:
+                self._encoder.encode(*cmd, encoder=encoder)
+            while True:
+                data = self._encoder.extract()
+                if data is None:
+                    break
+                try:
+                    self._socket.send(data)
+                except Exception as e:
+                    raise CommunicationError() from e
+        # TODO BaseException ?
+        except Exception:
+            self.close()
+            raise
 
+    # TODO (misc) should a decoding error be considered an CommunicationError ?
     def _recv(self, timeout=False, decoder=None):
         try:
             while True:
@@ -126,7 +131,6 @@ class SyncConnection:
                     continue
                 return res
         except socket.timeout:
-            # TODO handle this in connection pooling, to close the connection as well, but not in pushed
             return timeout_error
         except Exception as e:
             self.close()
@@ -147,18 +151,16 @@ class SyncConnection:
             self._command(b'SELECT', database)
             self._last_database = database
 
-    # TODO if we see SELECT we should update it manually !
+    # TODO (correctness) if we see SELECT we should update it manually !
     def __call__(self, *cmd, database=0):
         if not cmd:
             raise Exception()
         self.set_database(database)
-        # TODO meh detection
-        if isinstance(cmd[0], (tuple, list)):
+        if is_multiple_commands(*cmd):
             return self._commands(*cmd)
         else:
             return self._command(*cmd)
 
-    # TODO on grabage encoding, we need to kill this connection and start a new one !!!
     def _command(self, *cmd):
         if get_command_name(cmd) in not_allowed_commands:
             raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
@@ -175,6 +177,9 @@ class SyncConnection:
         # TODO close connection on timeout error
         if isinstance(res, Error):
             raise res
+        if res == timeout_error:
+            self.close()
+            raise TimeoutError()
         return res
 
     def _commands(self, *cmds):
@@ -182,6 +187,7 @@ class SyncConnection:
         self._send(*cmds, multiple=True, encoder=encoder)
         res = []
         found_errors = False
+        # TODO on error, return a partial error ?
         for _ in range(len(cmds)):
             result = self._recv(decoder=decoder)
             # TODO close connection on timeout error

@@ -22,7 +22,7 @@ class SyncConnectionPool:
         self.close()
     
     # This won't close connections which are in use currently
-    # TODO add a force option ?
+    # TODO (api) add a force option ?
     def close(self):
         for connection in self._connections_available:
             connection.close()
@@ -30,8 +30,9 @@ class SyncConnectionPool:
         self._connections_in_use.clear()
         self._limit = Semaphore(self._max_connections) if self._max_connections else None
 
-    # TODO if address is set, throw an exception ?
     def take(self, address=None):
+        if address is not None:
+            raise ValueError('ConnectionPool does not know to take an address')
         try:
             while True:
                 conn = self._connections_available.popleft()
