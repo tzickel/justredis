@@ -1,7 +1,12 @@
+from collections import OrderedDict
+
 from .errors import ProtocolError
 
 
-# TODO (misc) We can add helpfull error messages on which part the parsing failed, should we do that ?
+# TODO (misc) We can add helpful error messages on which part the parsing failed, should we do that ?
+# TODO (misc) Should we make ProtocolError the catchall chain ?
+# TODO (misc) For now exceptions aren't encoded and are always bytes (are they always guarrented to be ascii from the redis server, i.e. have no blob name) ?
+# TODO (misc) There is allot of code duplication here, we can merge most of it. (Also remove Resp2, as Resp3 is backward compatible and we have a unified handling now)
 
 
 # Python 2 bytearray implementation is less efficient, luckily it's EOL
@@ -59,6 +64,7 @@ class String(Result):
         return bytes(self.data)
 
 
+# TODO (misc) rename this to ReplyError ?
 class Error(Result, Exception):
     pass
 
@@ -115,10 +121,10 @@ def parse_decoding(decoding):
         raise ValueError('Invalid decoding: %r' % decoding)
 
 
-# TODO (misc) add close for pypy
 class RedisRespDecoder:
-    def __init__(self, decoder=None, **kwargs):
-        self._decoder = parse_decoding(decoder) or bytes
+    def __init__(self, decoder=None, with_attributes=False, **kwargs):
+        self._decoder = parse_decoding(decoder)
+        self._with_attributes = with_attributes
         self._buffer = Buffer()
         self._result = iter(self._extract_generator())
 
@@ -126,20 +132,25 @@ class RedisRespDecoder:
         self._buffer.append(data)
 
     # If you plan on handling both PUSH messages and normal messages on the same connection, specifing a custom decoder here till be problematic
-    def extract(self, decoder=None):
+    # Our codebase currently splits PUSH messages to a different connection so this is not an issue.
+    # TODO (misc) maybe add decoder, and push_decoder ?
+    def extract(self, decoder=None, with_attributes=None):
         # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
-        # Because there is PUSH replies, the decoder can be mixed, but in our code PUSH channels happen in a different connection
-        tmp = None
+        original_decoder = None
+        original_with_attributes = None
         if decoder is not None:
-            tmp = self._decoder
+            original_decoder = self._decoder
             self._decoder = parse_decoding(decoder)
+        if with_attributes is not None:
+            original_with_attributes = self._with_attributes
+            self._with_attributes = with_attributes
         res = next(self._result)
-        if tmp is not None:
-            self._decoder = tmp
+        if original_decoder is not None:
+            self._decoder = original_decoder
+        if original_with_attributes is not None:
+            self._with_attributes = original_with_attributes
         return res
 
-    # TODO (misc) we can remove lots of code duplication here
-    # Once an error happens here, the decoding will stop
     def _extract_generator(self):
         buffer = self._buffer
         array_stack = []
@@ -149,7 +160,7 @@ class RedisRespDecoder:
         while True:
             # Handle aggregate data
             while last_array is not None:
-                # Still more data needed to fill array response
+                # Still more data needed to fill aggregate response
                 if last_array[0] != len(last_array[1]):
                     break
                 # Result is an array
@@ -161,7 +172,7 @@ class RedisRespDecoder:
                     msg_type = Map
                     i = iter(last_array[1])
                     # TODO (misc) is this the best way to deal with y ?
-                    msg = dict([(bytes(y) if y.__hash__ is None else y, next(i)) for y in i])
+                    msg = OrderedDict([(bytes(y) if y.__hash__ is None else y, next(i)) for y in i])
                 # Result is an set
                 elif last_array[2] == 2:
                     msg_type = Set
@@ -170,26 +181,37 @@ class RedisRespDecoder:
                 elif last_array[2] == 3:
                     i = iter(last_array[1])
                     # TODO (misc) is this the best way to deal with y ?
-                    last_attribute = dict([(bytes(y) if y.__hash__ is None else y, next(i)) for y in i])
+                    last_attribute = OrderedDict([(bytes(y) if y.__hash__ is None else y, next(i)) for y in i])
                 # Result is an push
                 elif last_array[2] == 4:
                     msg_type = Push
                     msg = last_array[1]
                 else:
                     raise ProtocolError('Unknown aggregate type')
-                if array_stack:
-                    tmp = array_stack.pop()
-                    if last_array[2] != 3:
-                        msg = msg_type(msg, last_array[3])
-                        tmp[1].append(msg)
-                    last_array = tmp
-                else:
-                    if last_array[2] != 3:
-                        msg = msg_type(msg, last_array[3])
-                        last_array = None
-                        yield msg
+
+                # If it's an attribute, nothing to do
+                if last_array[2] == 3:
+                    if array_stack:
+                        last_array = array_stack.pop()
                     else:
                         last_array = None
+                else:
+                    if array_stack:
+                        tmp = array_stack.pop()
+                        if self._with_attributes:
+                            msg = msg_type(msg, last_array[3])
+                        elif msg_type is Push:
+                            msg = msg_type(msg)
+                        tmp[1].append(msg)
+                        last_array = tmp
+                    else:
+                        if self._with_attributes:
+                            msg = msg_type(msg, last_array[3])
+                        elif msg_type is Push:
+                            msg = msg_type(msg)
+                        last_array = None
+                        yield msg
+
 
             # General RESP3 parsing
             while len(buffer) == 0:
@@ -199,15 +221,17 @@ class RedisRespDecoder:
             if buffer.skip_if_startswith(b'+'):
                 msg_type = String
                 while True:
-                    msg = self._decoder(buffer.takeline())
+                    msg = buffer.takeline()
                     if msg is not None:
                         break
                     yield _need_more_data
+                msg = self._decoder(msg)
             # Simple error
             elif buffer.skip_if_startswith(b'-'):
                 msg_type = Error
                 while True:
-                    msg = self._decoder(buffer.takeline())
+                    # TODO (misc) decode to string as well ?
+                    msg = buffer.takeline()
                     if msg is not None:
                         break
                     yield _need_more_data
@@ -228,7 +252,7 @@ class RedisRespDecoder:
                     if length is not None:
                         break
                     yield _need_more_data
-                # Streamed strings
+                # Streamed string
                 if length == b'?':
                     chunks = []
                     while True:
@@ -249,6 +273,7 @@ class RedisRespDecoder:
                         chunks.append(buffer.take(chunk_size))
                         buffer.skip(2)
                     msg = self._decoder(b''.join(chunks))
+                    chunks = None
                 else:
                     length = int(length)
                     # Legacy RESP2 support
@@ -268,6 +293,7 @@ class RedisRespDecoder:
                     if length is not None:
                         break
                     yield _need_more_data
+                # Streamed array
                 if length == b'?':
                     length = None
                 else:
@@ -288,6 +314,7 @@ class RedisRespDecoder:
                     if length is not None:
                         break
                     yield _need_more_data
+                # Streamed set
                 if length == b'?':
                     length = None
                 else:
@@ -366,10 +393,12 @@ class RedisRespDecoder:
                     if length is not None:
                         break
                     yield _need_more_data
+                # Streamed map
                 if length == b'?':
                     length = None
                 else:
                     length = int(length) * 2
+                # Legacy RESP2 support
                 if length == -1:
                     msg = None
                 else:
@@ -386,6 +415,7 @@ class RedisRespDecoder:
                         break
                     yield _need_more_data
                 length = int(length) * 2
+                # Legacy RESP2 support
                 if length == -1:
                     msg = None
                 else:
@@ -418,39 +448,55 @@ class RedisRespDecoder:
                         break
                     yield _need_more_data
                 assert tmp == b''
+                assert last_array[0] == None
                 last_array[0] = len(last_array[1])
                 continue
             else:
-                raise ProtocolError('Unknown type: %s' % bytes(buffer.take(1)))
+                raise ProtocolError('Unknown type: %s' % bytes(buffer.take(1)).decode())
 
-            # TODO handle edge cases like error, RESP2 Null types, etc...
-            msg = msg_type(msg, last_attribute)
+            # Handle legacy RESP2 Null
+            if msg is None and msg_type is not Null:
+                msg_type = Null
+
+            if self._with_attributes:
+                msg = msg_type(msg, last_attribute)
+            # We still enforce this types, because of ambiguity with other types
+            elif msg_type in (Error, Push, BigNumber):
+                msg = msg_type(msg)
+
             last_attribute = None
+
             if last_array:
                 last_array[1].append(msg)
             else:
                 yield msg
 
 
-# TODO (misc) add close for pypy 
 class RedisResp2Decoder:
-    def __init__(self, decoder=None, **kwargs):
+    def __init__(self, decoder=None, with_attributes=False, **kwargs):
+        self._decoder = parse_decoding(decoder)
+        self._with_attributes = with_attributes
         self._buffer = Buffer()
-        self._decoder = parse_decoding(decoder) or bytes
         self._result = iter(self._extract_generator())
 
     def feed(self, data):
         self._buffer.append(data)
 
-    def extract(self, decoder=None):
+    def extract(self, decoder=None, with_attributes=None):
         # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
-        tmp = None
+        original_decoder = None
+        original_with_attributes = None
         if decoder is not None:
-            tmp = self._decoder
+            original_decoder = self._decoder
             self._decoder = parse_decoding(decoder)
+        if with_attributes is not None:
+            original_with_attributes = self._with_attributes
+            self._with_attributes = with_attributes
         res = next(self._result)
-        if tmp is not None:
-            self._decoder = tmp
+        if original_decoder is not None:
+            self._decoder = original_decoder
+        if original_with_attributes is not None:
+            self._with_attributes = original_with_attributes
         return res
 
     def _extract_generator(self):
@@ -458,13 +504,17 @@ class RedisResp2Decoder:
         array_stack = []
         last_array = None
         _need_more_data = need_more_data
+
         while True:
             # Handle aggregate data
             while last_array is not None:
                 # Still more data needed to fill aggregate response
                 if last_array[0] != len(last_array[1]):
                     break
+                msg_type = Array
                 msg = last_array[1]
+                if self._with_attributes:
+                    msg = msg_type(msg, None)
                 if array_stack:
                     tmp = array_stack.pop()
                     tmp[1].append(msg)
@@ -479,22 +529,25 @@ class RedisResp2Decoder:
 
             # Simple string
             if buffer.skip_if_startswith(b'+'):
+                msg_type = String
                 while True:
-                    msg = self._decoder(buffer.takeline())
-                    if msg is not None:
-                        break
-                    yield _need_more_data
-            # Simple error
-            elif buffer.skip_if_startswith(b'-'):
-                while True:
-                    # TODO decode to string as well ?
                     msg = buffer.takeline()
                     if msg is not None:
                         break
                     yield _need_more_data
-                msg = Error(msg)
+                msg = self._decoder(msg)
+            # Simple error
+            elif buffer.skip_if_startswith(b'-'):
+                msg_type = Error
+                while True:
+                    # TODO (misc) decode to string as well ?
+                    msg = buffer.takeline()
+                    if msg is not None:
+                        break
+                    yield _need_more_data
             # Number
             elif buffer.skip_if_startswith(b':'):
+                msg_type = Number
                 while True:
                     msg = buffer.takeline()
                     if msg is not None:
@@ -503,6 +556,7 @@ class RedisResp2Decoder:
                 msg = int(msg)
             # Blob string
             elif buffer.skip_if_startswith(b'$'):
+                msg_type = String
                 while True:
                     length = buffer.takeline()
                     if length is not None:
@@ -536,9 +590,14 @@ class RedisResp2Decoder:
                     last_array = [length, [], 0, None]
                     continue
             else:
-                raise ProtocolError('Unknown RESP2 type: %s' % bytes(buffer.take(1)))
+                raise ProtocolError('Unknown RESP2 type: %s' % bytes(buffer.take(1)).decode())
 
-            if last_array:
+            if self._with_attributes:
+                msg = msg_type(msg, None)
+            elif msg_type is Error:
+                msg = Error(msg)
+
+            if last_array is not None:
                 last_array[1].append(msg)
             else:
                 yield msg
