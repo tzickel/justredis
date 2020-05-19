@@ -4,7 +4,7 @@ from justredis import SyncRedis, Error
 
 def test_auth(redis6_with_blah_passwd):
     # No password
-    r = SyncRedis(address=redis6_with_blah_passwd, pool_factory='pool')
+    r = SyncRedis(address=redis6_with_blah_passwd)#, pool_factory='pool')
 
     with pytest.raises(Error) as exc_info:
         r('set', 'a', 'b')

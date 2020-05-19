@@ -23,9 +23,8 @@ def parse_url(url):
     return res
 
 
+# TODO (misc) can we do all those commands better, maybe with a special class for CustomCommand parameters?
 def get_command_name(cmd):
-    if isinstance(cmd[0], dict):
-        cmd = cmd[0]['command']
     cmd = cmd[0]
     cmd = cmd.upper()
     if isinstance(cmd, str):
@@ -33,9 +32,16 @@ def get_command_name(cmd):
     return cmd
 
 
-# TODO (misc) can we do this better ?
 def is_multiple_commands(*cmd):
     if isinstance(cmd[0], (tuple, list)):
         return True
     else:
         return False
+
+
+def get_command(*cmd):
+    if isinstance(cmd[0], dict):
+        cmd = cmd[0]
+        return cmd['command'], cmd.get('encoder', None), cmd.get('decoder', None), cmd.get('attributes', None)
+    else:
+        return cmd, None, None, None

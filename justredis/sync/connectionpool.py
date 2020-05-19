@@ -24,10 +24,11 @@ class SyncConnectionPool:
     # This won't close connections which are in use currently
     # TODO (api) add a force option ?
     def close(self):
+        # We do this first, so if another thread calls release it won't get back to the pool
+        self._connections_in_use.clear()
         for connection in self._connections_available:
             connection.close()
         self._connections_available.clear()
-        self._connections_in_use.clear()
         self._limit = Semaphore(self._max_connections) if self._max_connections else None
 
     def take(self, address=None):
@@ -56,6 +57,7 @@ class SyncConnectionPool:
         try:
             self._connections_in_use.remove(conn)
         # If this fails, it's a connection from a previous cycle, don't reuse it
+        # TODO (correctness) should we release the self._limit here as well ? (or just make close forever)
         except KeyError:
             conn.close()
             return

@@ -4,7 +4,7 @@ import socket
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
-from ..utils import get_command_name, is_multiple_commands
+from ..utils import get_command_name, is_multiple_commands, get_command
 from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper, SyncSslSocketWrapper
 
 
@@ -114,10 +114,10 @@ class SyncConnection:
             raise
 
     # TODO (misc) should a decoding error be considered an CommunicationError ?
-    def _recv(self, timeout=False, decoder=None):
+    def _recv(self, timeout=False, decoder=None, attributes=None):
         try:
             while True:
-                res = self._decoder.extract(decoder=decoder)
+                res = self._decoder.extract(decoder=decoder, with_attributes=attributes)
                 if res == need_more_data:
                     if self._seen_eof:
                         self.close()
@@ -162,19 +162,11 @@ class SyncConnection:
             return self._command(*cmd)
 
     def _command(self, *cmd):
+        cmd, encoder, decoder, attributes = get_command(*cmd)
         if get_command_name(cmd) in not_allowed_commands:
             raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
-        if isinstance(cmd[0], dict):
-            cmd = cmd[0]
-            encoder = cmd.get('encoder', None)
-            decoder = cmd.get('decoder', None)
-            cmd = cmd['command']
-        else:
-            encoder = None
-            decoder = None
         self._send(*cmd, encoder=encoder)
-        res = self._recv(decoder=decoder)
-        # TODO close connection on timeout error
+        res = self._recv(decoder=decoder, attributes=attributes)
         if isinstance(res, Error):
             raise res
         if res == timeout_error:
@@ -182,12 +174,13 @@ class SyncConnection:
             raise TimeoutError()
         return res
 
+    # TODO FIX THIS!!!
     def _commands(self, *cmds):
-        # TODO handle dictionary of multiple encoding / decoding here :()
+        # TODO (bug) handle dictionary of multiple encoding / decoding here :()
         self._send(*cmds, multiple=True, encoder=encoder)
         res = []
         found_errors = False
-        # TODO on error, return a partial error ?
+        # TODO (misc) on error, return a partial error ?
         for _ in range(len(cmds)):
             result = self._recv(decoder=decoder)
             # TODO close connection on timeout error

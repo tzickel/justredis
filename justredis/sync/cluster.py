@@ -5,6 +5,7 @@ from contextlib import contextmanager
 
 from .connectionpool import SyncConnectionPool
 from ..decoder import Error
+from ..utils import is_multiple_commands
 
 
 def calc_hashslot(key):
@@ -25,7 +26,7 @@ def calc_hashslot(key):
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:
-            address = kwargs.get('address')
+            address = kwargs.pop('address', None)
             if address:
                 addresses = (address, )
             else:
@@ -86,10 +87,10 @@ class SyncClusterConnectionPool:
         conn = self.take(address)
         return conn
 
-    def _get_index_for_command(self, cmd):
+    def _get_index_for_command(self, *cmd):
         # commands are ascii, yes ? some commands can be larger than cmd[0] for index ? meh, let's be optimistic for now
-        if isinstance(cmd, dict):
-            cmd = cmd['command']
+        if isinstance(cmd[0], dict):
+            cmd = cmd[0]['command']
         command = bytes(cmd[0], 'ascii').upper()
         index = self._command_cache.get(command, -1)
         if index != -1:
@@ -143,8 +144,7 @@ class SyncClusterConnectionPool:
 
     def take_by_cmd(self, *cmd):
         index = None
-        # TODO meh detection (refactor into utils?)
-        if isinstance(cmd[0], (tuple, list)):
+        if is_multiple_commands(*cmd):
             for command in cmd:
                 index = self._get_index_for_command(*command)
                 if index is not None:
@@ -182,7 +182,7 @@ class SyncClusterConnectionPool:
 
     @contextmanager
     def connection(self, key, _database=0):
-        if self._clustered == False :
+        if self._clustered == False:
             conn = self.take()
         else:
             conn = self.take_by_key(key)
