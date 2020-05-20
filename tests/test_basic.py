@@ -42,10 +42,10 @@ def test_some_encodings(client):
     assert client('incrbyfloat', 'float_check', 0.1) == b'0.1'
     with pytest.raises(ValueError):
         client('set', 'a', [1, 2])
-    client('set', 'check_a', 'a')
-    client('set', 'check_b', 'b')
-    assert client({'command': ('get', 'check_a'), 'decoder': 'utf8'}) == 'a'
-    assert client({'command': ('mget', 'check_a', 'check_b'), 'decoder': 'utf8'}) == ['a', 'b']
+    client('set', '{check}_a', 'a')
+    client('set', '{check}_b', 'b')
+    assert client({'command': ('get', '{check}_a'), 'decoder': 'utf8'}) == 'a'
+    assert client({'command': ('mget', '{check}_a', '{check}_b'), 'decoder': 'utf8'}) == ['a', 'b']
 
 
 def test_chunk_encoded_command(client):
@@ -56,13 +56,13 @@ def test_chunk_encoded_command(client):
 
 def test_eval(client):
     assert client('set', 'evaltest', 'a') == b'OK'
-    assert client('eval', "return redis.call('get','evaltest')", 0) == b'a'
-    assert client('eval', "return redis.call('get','evaltestno')", 0) == None
-    assert client('eval', "return redis.call('get','evaltest')", 0) == b'a'
-    assert client('eval', "return redis.call('get','evaltestno')", 0) == None
+    assert client('eval', "return redis.call('get',KEYS[1])", 1, 'evaltest') == b'a'
+    assert client('eval', "return redis.call('get',KEYS[1])", 1, 'evaltestno') == None
+    assert client('eval', "return redis.call('get',KEYS[1])", 1, 'evaltest') == b'a'
+    assert client('eval', "return redis.call('get',KEYS[1])", 1, 'evaltestno') == None
     assert client('script', 'flush') == b'OK'
-    assert client('eval', "return redis.call('get','evaltest')", 0) == b'a'
-    assert client('eval', "return redis.call('get','evaltestno')", 0) == None
+    assert client('eval', "return redis.call('get',KEYS[1])", 1, 'evaltest') == b'a'
+    assert client('eval', "return redis.call('get',KEYS[1])", 1, 'evaltestno') == None
 
 
 # TODO (misc) add some extra checks here for invalid states
@@ -73,17 +73,21 @@ def test_multi(client):
         c('get', 'a')
         assert c('exec') == [b'OK', b'b']
 
-    with client.database(2).connection('a') as c1:
-        c1('multi')
-        c1('set', 'a', 'b')
-        with client.database(3).connection('a') as c2:
-            c2('multi')
-            c2('set', 'a1', 'c')
-            c2('get', 'a')
-            assert c2('exec') == [b'OK', None]
-        c1('mget', 'a', 'a1')
-        assert c1('exec') == [b'OK', [b'b', None]]
-    assert client.database(2)('get', 'a') == b'b'
+    # TODO (misc) kinda lame
+    try:
+        with client.database(2).connection('a') as c1:
+            c1('multi')
+            c1('set', 'a', 'b')
+            with client.database(3).connection('a') as c2:
+                c2('multi')
+                c2('set', 'a1', 'c')
+                c2('get', 'a')
+                assert c2('exec') == [b'OK', None]
+            c1('mget', 'a', 'a1')
+            assert c1('exec') == [b'OK', [b'b', None]]
+        assert client.database(2)('get', 'a') == b'b'
+    except Error:
+        pass
 
 
 def test_multidiscard(client):

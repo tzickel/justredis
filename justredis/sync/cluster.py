@@ -79,9 +79,9 @@ class SyncClusterConnectionPool:
             previous_connections = set(self._connections.keys())
             new_connections = set([x[1] for x in slots])
             connections_to_remove = previous_connections - new_connections
-            for connection in connections_to_remove:
-               connection.close()
-               del self._connections[connection]
+            for address in connections_to_remove:
+               self._connections[address].close()
+               del self._connections[address]
             self._slots = slots
 
             # TODO (misc) we can optimize this to only invalidate self._last_connection if it's not in new_connections
@@ -151,7 +151,7 @@ class SyncClusterConnectionPool:
                 return self._last_connection.take()
             except:
                 self._last_connection = None
-        endpoints = self._connections.keys()
+        endpoints = self.endpoints()
         if not endpoints:
             endpoints = self._initial_addresses
         for address in endpoints:
@@ -201,6 +201,7 @@ class SyncClusterConnectionPool:
         if self._clustered == False:
             conn = self.take()
         else:
+            # TODO (misc) defend against _database != 0
             conn = self.take_by_cmd(*cmd)
         try:
             # TODO handle MOVED error here
@@ -213,6 +214,7 @@ class SyncClusterConnectionPool:
         if self._clustered == False:
             conn = self.take()
         else:
+            # TODO (misc) defend against _database != 0
             conn = self.take_by_key(key)
         try:
             conn.set_database(_database)
@@ -225,3 +227,22 @@ class SyncClusterConnectionPool:
             except Error:
                 pass
             self.release(conn)
+
+    def on_all_masters(self, *cmd):
+        if self._clustered == False:
+            return self(*cmd)
+        elif self._clustered is None:
+            self._update_slots()
+        res = {}
+        # TODO (correctness) if this loop fails, catch and return partial error... just like multiple concurrent commands
+        for address in self.endpoints():
+            conn = self.take(address)
+            try:
+                res[address] = conn(*cmd)
+            except:
+                self.release(conn)
+        return res
+
+    # TODO (misc) thread safety
+    def endpoints(self):
+        return [x[1] for x in self._slots]

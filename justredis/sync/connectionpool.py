@@ -87,3 +87,6 @@ class SyncConnectionPool:
             except Error:
                 pass
             self.release(conn)
+
+    def on_all_masters(*cmd):
+        raise NotImplementedError('This function only works in clusters')

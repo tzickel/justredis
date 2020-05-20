@@ -18,8 +18,23 @@ def redis_with_client(dockerimage='redis', extraparams=''):
 def redis_cluster_with_client(dockerimage='redis', extraparams=''):
     import redis_server
 
-    servers = redis_server.start_cluster(3, dockerimage=dockerimage, extraparams=extraparams)
+    servers, stdout = redis_server.start_cluster(3, dockerimage=dockerimage, extraparams=extraparams)
     with SyncRedis(address=('localhost', servers[0].port)) as r:
+        import time
+        wait = 50
+        while wait:
+            result = r.on_all_masters(b'CLUSTER', b'INFO')
+            ready = True
+            for res in result.values():
+                if b'cluster_state:ok' not in res:
+                    ready = False
+                    break
+            if ready:
+                break
+            time.sleep(1)
+            wait -= 1
+        if not wait:
+            raise Exception('Cluster is down, could not run test')
         yield r
 
 

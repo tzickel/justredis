@@ -88,6 +88,9 @@ class SyncRedis:
     def database(self, database):
         return SyncDatabase(self, database)
 
+    def on_all_masters(self, *cmd):
+        return self._connection_pool.on_all_masters(*cmd)
+
 
 class SyncDatabase:
     def __init__(self, redis, database):
