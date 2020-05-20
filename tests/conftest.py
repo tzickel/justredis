@@ -1,4 +1,5 @@
 import pytest
+from justredis import SyncRedis
 
 
 # TODO in the future allow direct redis instances ?
@@ -13,9 +14,27 @@ def redis(dockerimage='redis', extraparams=''):
         instance.close()
 
 
+def redis_with_client(dockerimage='redis', extraparams=''):
+    import redis_server
+
+    instance = redis_server.RedisServer(dockerimage=dockerimage, extraparams=extraparams)
+    with SyncRedis(address=('localhost', instance.port)) as r:
+        try:
+            yield r
+        finally:
+            instance.close()
+
+
+
 @pytest.fixture
 def redis6():
     for item in redis('redis:6'):
+        yield item
+
+
+@pytest.fixture
+def redis6_with_client():
+    for item in redis_with_client('redis:6'):
         yield item
 
 

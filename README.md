@@ -9,25 +9,30 @@ Why ?
 
 RESP2/RESP3 support
 
+The client can talk to Redis servers both as RESP2 and RESP3. You can explicitly specify which version you want, and specify if you are intrested in recving attributes or not (this effects which result types you get). The API Questions below documents what this means.
+
 Cluster support
 
-Per command settings
+The client will automatically detect if the server is part of a cluster or not, and figure out which keys are part of a command. You can manually force it to not use a cluster.
 
-Nice Roadmap ?
+Per command optional settings (encoding, decoding, attribues)
 
+If you configured the client to decode the results as unicode strings, but you want a specific result to be left as an bytes, you can specify that. The API Questions below shows how to do that.
+
+If for set the connection to handle results as unicode strings, but you want to recive a specific 
 
 Roadmap
 ---
-Async support with the same API (but with await ofcourse)
-Custom suuport for SSL, gevent (without monkey patching)
-EVAL script caching
+Async support with the same exact API (but with the await keyword), currently for asyncio
+Transparent EVAL script caching
+More cluster features (both master, and replicas)
 
-Not on roadmap
+Not on roadmap (for now)
 ---
-Sentinal
-High level support for locks, etc...
-Manual
 hiredis support
+sentinal server support
+high level features which are not part of the redis specification (such as locks)
+manually specifing each command it's result and help (maybe for special stuff like bit operations?)
 
 Installing
 ---
@@ -39,4 +44,7 @@ API
 ---
 
 Redis command replacments
+---
+
+API questions
 ---
