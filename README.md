@@ -19,8 +19,6 @@ Per command optional settings (encoding, decoding, attribues)
 
 If you configured the client to decode the results as unicode strings, but you want a specific result to be left as an bytes, you can specify that. The API Questions below shows how to do that.
 
-If for set the connection to handle results as unicode strings, but you want to recive a specific 
-
 
 Roadmap
 ---

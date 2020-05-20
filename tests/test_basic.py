@@ -2,7 +2,7 @@ import pytest
 from justredis import SyncRedis, Error
 
 
-# TODO (misc) copy all of example.py into here
+# TODO (misc) copy all of misc/example.py into here
 
 
 def test_auth(client_with_blah_password):

@@ -17,9 +17,10 @@ elif sys.platform.startswith('win'):
 def start_cluster(masters, dockerimage=None, extraparams='', ipv4=True):
     addr = '127.0.0.1' if ipv4 else '::1'
     ret = []
-    subprocess.call('rm /tmp/justredis_cluster*.conf', shell=True)
+    if dockerimage is None:
+        subprocess.call('rm /tmp/justredis_cluster*.conf', shell=True)
     for x in range(masters):
-        ret.append(RedisServer(extraparams='--cluster-enabled yes --cluster-config-file /tmp/justredis_cluster%d.conf' % x))
+        ret.append(RedisServer(dockerimage=dockerimage, extraparams='--cluster-enabled yes --cluster-config-file /tmp/justredis_cluster%d.conf' % x))
     # Requires redis-cli from version 5 for cluster management support
     stdout = subprocess.Popen('redis-cli --cluster create ' + ' '.join(['%s:%d' % (addr, server.port) for server in ret]), stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True).communicate(b'yes\n')
     return ret
@@ -32,7 +33,8 @@ class RedisServer(object):
             self.close()
             self._port = random.randint(1025, 65535)
             if dockerimage:
-                cmd = 'docker run --rm -p {port}:6379 {image} --save {extraparams}'.format(port=self.port, image=dockerimage, extraparams=extraparams)
+                cmd = 'docker run --rm --net=host {image} --save --port {port} {extraparams}'.format(port=self.port, image=dockerimage, extraparams=extraparams)
+                #cmd = 'docker run --rm -p {port}:6379 {image} --save {extraparams}'.format(port=self.port, image=dockerimage, extraparams=extraparams)
             else:
                 cmd = 'redis-server --save --port {port} {extraparams}'.format(port=self.port, extraparams=extraparams)
             kwargs = {}
