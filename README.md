@@ -21,11 +21,15 @@ If you configured the client to decode the results as unicode strings, but you w
 
 If for set the connection to handle results as unicode strings, but you want to recive a specific 
 
+
 Roadmap
 ---
 Async support with the same exact API (but with the await keyword), currently for asyncio
 Transparent EVAL script caching
 More cluster features (both master, and replicas)
+Clear seperation between the I/O and concurrency code to the rest
+
+Should allow for easy portablity to other event loops such as gevent, and async ones such as asyncio and trio.
 
 Not on roadmap (for now)
 ---

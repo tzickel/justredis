@@ -25,7 +25,6 @@ def redis_with_client(dockerimage='redis', extraparams=''):
             instance.close()
 
 
-
 @pytest.fixture
 def redis6():
     for item in redis('redis:6'):
@@ -41,6 +40,12 @@ def redis6_with_client():
 @pytest.fixture
 def redis5():
     for item in redis('redis:5'):
+        yield item
+
+
+@pytest.fixture
+def redis5_with_client():
+    for item in redis_with_client('redis:5'):
         yield item
 
 

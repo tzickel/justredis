@@ -192,6 +192,12 @@ class SyncPubSub(SyncPersistentConnection):
         if not self._channels and not self._patterns:
             raise Exception('Not listening to anything')
 
+    def ping(self, msg=None):
+        if msg is not None:
+            self._conn.push_command(b'PING', msg)
+        else:
+            self._conn.push_command(b'PING')
+
     def subscribe(self, *channels):
         self._channels.update(channels)
         if self._check_connection():

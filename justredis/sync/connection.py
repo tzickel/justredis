@@ -153,10 +153,11 @@ class SyncConnection:
             self._last_database = database
 
     # TODO (correctness) if we see SELECT we should update it manually !
-    def __call__(self, *cmd, database=0):
+    def __call__(self, *cmd, database=None):
         if not cmd:
             raise Exception()
-        self.set_database(database)
+        if database is not None:
+            self.set_database(database)
         if is_multiple_commands(*cmd):
             return self._commands(*cmd)
         else:

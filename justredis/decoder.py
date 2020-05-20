@@ -200,15 +200,17 @@ class RedisRespDecoder:
                         tmp = array_stack.pop()
                         if self._with_attributes:
                             msg = msg_type(msg, last_array[3])
-                        elif msg_type is Push:
-                            msg = msg_type(msg)
+                        # For now this isn't done, since we handle Push in unique connections
+                        #elif msg_type is Push:
+                            #msg = msg_type(msg)
                         tmp[1].append(msg)
                         last_array = tmp
                     else:
                         if self._with_attributes:
                             msg = msg_type(msg, last_array[3])
-                        elif msg_type is Push:
-                            msg = msg_type(msg)
+                        # For now this isn't done, since we handle Push in unique connections
+                        #elif msg_type is Push:
+                            #msg = msg_type(msg)
                         last_array = None
                         yield msg
 
@@ -461,7 +463,7 @@ class RedisRespDecoder:
             if self._with_attributes:
                 msg = msg_type(msg, last_attribute)
             # We still enforce this types, because of ambiguity with other types
-            elif msg_type in (Error, Push, BigNumber):
+            elif msg_type in (Error, BigNumber):
                 msg = msg_type(msg)
 
             last_attribute = None

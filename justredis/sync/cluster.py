@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from .connectionpool import SyncConnectionPool
 from ..decoder import Error
 from ..utils import is_multiple_commands
+from ..encoder import parse_encoding
 
 
 def calc_hashslot(key):
@@ -163,6 +164,8 @@ class SyncClusterConnectionPool:
         return conn
 
     def take_by_key(self, key):
+        if not isinstance(key, (bytes, bytearray)):
+            key = parse_encoding(self._settings.get('encoder', None))(key)
         hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
 

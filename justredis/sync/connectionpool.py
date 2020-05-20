@@ -32,7 +32,7 @@ class SyncConnectionPool:
         self._limit = Semaphore(self._max_connections) if self._max_connections else None
 
     def take(self, address=None):
-        # TODO (corectness) cluster depends on this failing if closed !
+        # TODO (correctness) cluster depends on this failing if closed !
         if address is not None:
             raise ValueError('ConnectionPool does not know to take an address')
         try:
