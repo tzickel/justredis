@@ -50,6 +50,8 @@ class SyncRedis:
         elif pool_factory == 'auto':
             pool_factory = SyncClusterConnectionPool
         self._connection_pool = pool_factory(**kwargs)
+        # TODO (misc) should I keep it here for debugging ? maybe __repr__ ?
+        self._settings = kwargs
 
     def __del__(self):
         self.close()
