@@ -97,7 +97,7 @@ class SyncConnection:
         try:
             if multiple:
                 for _cmd in cmd:
-                    self._encoder.encode(*_cmd, encoder=encoder)
+                    self._encoder.encode(*_cmd[0], encoder=_cmd[1])
             else:
                 self._encoder.encode(*cmd, encoder=encoder)
             while True:
@@ -143,6 +143,7 @@ class SyncConnection:
         return res
 
     # TODO (api) should have encoding as well ?
+    # TODO (misc) don't accept multiple commands here
     def push_command(self, *cmd):
         self._send(*cmd)
 
@@ -174,18 +175,26 @@ class SyncConnection:
             raise TimeoutError()
         return res
 
-    # TODO FIX THIS!!!
     def _commands(self, *cmds):
-        # TODO (bug) handle dictionary of multiple encoding / decoding here :()
-        self._send(*cmds, multiple=True, encoder=encoder)
+        send = []
+        recv = []
+        for cmd in cmds:
+            cmd, encoder, decoder, attributes = get_command(*cmd)
+            if get_command_name(cmd) in not_allowed_commands:
+                raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
+            send.append((cmd, encoder))
+            recv.append((decoder, attributes))
+        # TODO (correctness) check if I need to pass here *send or send
+        self._send(send, multiple=True)
         res = []
         found_errors = False
         # TODO (misc) on error, return a partial error ?
-        for _ in range(len(cmds)):
-            result = self._recv(decoder=decoder)
-            # TODO close connection on timeout error
+        for _recv in recv:
+            result = self._recv(decoder=_recv[0], attributes=_recv[1])
             if isinstance(result, Error):
                 found_errors = True
+            if result == timeout_error:
+                self.close()
             res.append(result)
         if found_errors:
             raise Exception(res)
