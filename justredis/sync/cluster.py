@@ -52,7 +52,6 @@ class SyncClusterConnectionPool:
             self._connections.clear()
             self._last_connection = None
 
-    # TODO (misc) add a hints option when there is a moved
     def _update_slots(self):
         # TODO (misc) or if there is a hint from MOVED, recheck if clustered !
         if self._clustered is False:
@@ -116,7 +115,7 @@ class SyncClusterConnectionPool:
             return index
         conn = self.take()
         try:
-            # TODO (coorectness) see how this is in RESP2/RESP3
+            # TODO (coorectness) see how this is in RESP2/RESP3 (also encoding !!!!!!!!!!!)
             command_info = conn(b'COMMAND', b'INFO', command)
         finally:
             self.release(conn)
@@ -125,6 +124,18 @@ class SyncClusterConnectionPool:
             index = command_info[3]
         else:
             index = 0
+        """if index == 0:
+            conn = self.take()
+            try:
+                # TODO (coorectness) see how this is in RESP2/RESP3 (also encoding !!!!!!!!!!!)
+                command = [b'COMMAND', b'GETKEYS']
+                command.extend(cmd)
+                command_info = conn(*command)
+                import pdb; pdb.set_trace()
+            except Exception:
+                pass
+            finally:
+                self.release(conn)"""
         self._command_cache[command] = index
         # TODO map unknown to None
         return index
@@ -184,7 +195,23 @@ class SyncClusterConnectionPool:
         # TODO WRONG AND LAME
         if isinstance(cmd[0], dict):
             cmd = cmd[0]['command']
-        hashslot = calc_hashslot(cmd[index].encode())
+        if index == 0:
+            conn = self.take()
+            try:
+                # TODO (correctness) see how this is in RESP2/RESP3 (also encoding !!!!!!!!!!!)
+                command = [b'COMMAND', b'GETKEYS']
+                command.extend(cmd)
+                command_info = conn(*command)
+                key = command_info[0]
+            except Exception:
+                # TODO (what to do here?)
+                return self.take()
+                pass
+            finally:
+                self.release(conn)
+        else:
+            key = cmd[index].encode()
+        hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
 
     def release(self, conn):
@@ -201,14 +228,21 @@ class SyncClusterConnectionPool:
         if self._clustered == False:
             conn = self.take()
         else:
-            # TODO (misc) defend against _database != 0
+            # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
             conn = self.take_by_cmd(*cmd)
         try:
-            # TODO handle MOVED error here
             return conn(*cmd, database=_database)
+        # TODO (document) PartialError response here won't handle those MOVED ?
+        except Error as e:
+            if e.args[0].startswith(b'MOVED '):
+                # TODO (misc) here is a case to reuse this connection instead of getting a new one inside _update_slots
+                self._update_slots()
+                return self(*cmd)
+            raise
         finally:
             self.release(conn)
 
+    # TODO (documentation) because of MOVED semantics, it's best that on exception you should re-get a new cnonection each time (even on watch error)
     @contextmanager
     def connection(self, key, _database=0):
         if self._clustered == False:
@@ -230,6 +264,7 @@ class SyncClusterConnectionPool:
 
     def on_all_masters(self, *cmd):
         if self._clustered == False:
+            # TODO (correctness) fix the output to include the address
             return self(*cmd)
         elif self._clustered is None:
             self._update_slots()
@@ -244,5 +279,6 @@ class SyncClusterConnectionPool:
         return res
 
     # TODO (misc) thread safety
+    # TODO (correctness) if not clustered, return the ip still...
     def endpoints(self):
         return [x[1] for x in self._slots]
