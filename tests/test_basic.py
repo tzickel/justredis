@@ -26,8 +26,19 @@ def test_auth(client_with_blah_password):
 
 
 def test_simple(client):
-    assert client('set', 'a', 'b') == b'OK'
-    assert client('get', 'a') == b'b'
+    assert client('set', 'a', 'a') == b'OK'
+    assert client('set', 'b', 'b') == b'OK'
+    assert client('set', 'c', 'c') == b'OK'
+    assert client('set', '{a}b', 'd') == b'OK'
+    assert client('get', 'a') == b'a'
+    try:
+        with client.database(1).connection('a') as c:
+            c('set', 'a', 'a') == b'OK'
+    except Error as e:
+        if e.args[0] == b'ERR SELECT is not allowed in cluster mode':
+            pass
+        else:
+            raise
 
 
 def test_notallowed(client):
@@ -86,8 +97,11 @@ def test_multi(client):
             c1('mget', 'a', 'a1')
             assert c1('exec') == [b'OK', [b'b', None]]
         assert client.database(2)('get', 'a') == b'b'
-    except Error:
-        pass
+    except Error as e:
+        if e.args[0] == b'ERR SELECT is not allowed in cluster mode':
+            pass
+        else:
+            raise
 
 
 def test_multidiscard(client):
@@ -120,3 +134,38 @@ def test_pubsub(client):
         pubsub.ping(b'hi')
         assert pubsub.next_message() in (b'hi', [b'pong', b'hi'])
         pubsub.unsubscribe('hi')
+
+
+def test_misc(client):
+    # This tests an command which redis server says keys start in index 2.
+    client('object', 'help')
+    # Check command with no keys
+    client('client', 'list')
+
+
+def test_server(client):
+    # TODO split keys to 3 comps
+    client('set', 'cluster_aa', 'a') == b'OK'
+    client('set', 'cluster_bb', 'b') == b'OK'
+    client('set', 'cluster_cc', 'c') == b'OK'
+    # TODO this is bad, return ips
+    result = client.on_all_masters('keys', 'cluster_*')
+    # TODO check both cluster and not cluster
+    if len(result) == 1:
+        result = list(result.values())
+        result = [i for s in result for i in s]
+    else:
+        assert len(result) == 3
+        result = list(result.values())
+        result = [i for s in result for i in s]
+    assert set(result) == set([b'cluster_aa', b'cluster_bb', b'cluster_cc'])
+
+"""def test_moved(self):
+    self.assertEqual(await self.cr0(b'set', b'aa', b'a'), b'OK')
+    self.assertEqual(await self.cr0(b'set', b'bb', b'b'), b'OK')
+    self.assertEqual(await self.cr0(b'set', b'cc', b'c'), b'OK')
+    result = await self.mp.run_commandreply_on_all_masters(b'GET', b'aa')
+    self.assertEqual(len(result), 3)
+    result = list(result.values())
+    self.assertEqual(result, [b'a', b'a', b'a'])
+"""

@@ -195,6 +195,7 @@ class SyncClusterConnectionPool:
         # TODO WRONG AND LAME
         if isinstance(cmd[0], dict):
             cmd = cmd[0]['command']
+        # TODO maybe see if command is movablekeys, and only do this then, for optimizations
         if index == 0:
             conn = self.take()
             try:
@@ -210,7 +211,10 @@ class SyncClusterConnectionPool:
             finally:
                 self.release(conn)
         else:
-            key = cmd[index].encode()
+            if len(cmd) - 1 < index:
+                return self.take()
+            else:
+                key = cmd[index].encode()
         hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
 
@@ -265,7 +269,7 @@ class SyncClusterConnectionPool:
     def on_all_masters(self, *cmd):
         if self._clustered == False:
             # TODO (correctness) fix the output to include the address
-            return self(*cmd)
+            return {'local': self(*cmd)}
         elif self._clustered is None:
             self._update_slots()
         res = {}
