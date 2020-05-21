@@ -160,12 +160,15 @@ def test_server(client):
         result = [i for s in result for i in s]
     assert set(result) == set([b'cluster_aa', b'cluster_bb', b'cluster_cc'])
 
-"""def test_moved(self):
-    self.assertEqual(await self.cr0(b'set', b'aa', b'a'), b'OK')
-    self.assertEqual(await self.cr0(b'set', b'bb', b'b'), b'OK')
-    self.assertEqual(await self.cr0(b'set', b'cc', b'c'), b'OK')
-    result = await self.mp.run_commandreply_on_all_masters(b'GET', b'aa')
-    self.assertEqual(len(result), 3)
-    result = list(result.values())
-    self.assertEqual(result, [b'a', b'a', b'a'])
-"""
+
+def test_moved(client):
+    client('set', 'aa', 'a') == b'OK'
+    client('set', 'bb', 'b') == b'OK'
+    client('set', 'cc', 'c') == b'OK'
+    result = client.on_all_masters('get', 'aa')
+    if len(result) == 1:
+        result = list(result.values())
+        assert result == [b'a']
+    else:
+        result = list(result.values())
+        assert result == [b'a', b'a', b'a']
