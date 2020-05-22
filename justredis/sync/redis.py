@@ -1,17 +1,66 @@
-from inspect import isclass
-
-
 from .connectionpool import SyncConnectionPool
 from .cluster import SyncClusterConnectionPool
 from ..decoder import Error
 from ..utils import parse_url
 
 
+def merge_dicts(parent, child):
+    if not parent and not child:
+        return None
+    elif not parent:
+        return child
+    elif not child:
+        return parent
+    tmp = parent.copy()
+    tmp.update(child)
+    return tmp
+
+
+# We do this seperation to allow changing per command and connection settings easily
+class ModifiedRedis:
+    def __init__(self, connection_pool, **kwargs):
+        self._connection_pool = connection_pool
+        self._settings = kwargs
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        self._connection_pool = self._settings = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def __call__(self, *cmd, **kwargs):
+        settings = merge_dicts(self._settings, kwargs)
+        if settings is None:
+            return self._connection_pool(*cmd)
+        else:
+            return self._connection_pool(*cmd, **settings)
+
+    def connection(self, push=False, **kwargs):
+        wrapper = PushConnection if push else Connection
+        settings = merge_dicts(self._settings, kwargs)
+        if settings is None:
+            return wrapper(self._connection_pool)
+        else:
+            return wrapper(self._connection_pool, **settings)
+
+    def endpoints(self):
+        return self._connection_pool.endpoints()
+
+    def modify(self, **kwargs):
+        settings = self._settings.copy()
+        settings.update(kwargs)
+        return ModifiedRedis(self._connection_pool, **settings)
+
+
 # TODO get callback when slots have changes (maybe listen to other connections?) (or invalidate open connections)
-# TODO recursive modifiers ?
-# TODO why do we need this class ? to save state maybe (for recrusive modifiers?)
 # TODO allow MRO registration for spealized commands !
-class SyncRedis:
+class SyncRedis(ModifiedRedis):
     @classmethod
     def from_url(cls, url, **kwargs):
         res = parse_url(url)
@@ -55,11 +104,7 @@ class SyncRedis:
             pool_factory = SyncConnectionPool
         elif pool_factory == 'auto':
             pool_factory = SyncClusterConnectionPool
-        if isclass(pool_factory):
-            self._connection_pool = pool_factory(**kwargs)
-        else:
-            self._connection_pool = pool_factory
-        self._settings = kwargs
+        super(SyncRedis, self).__init__(pool_factory(**kwargs), **kwargs)
 
     def __del__(self):
         self.close()
@@ -69,43 +114,17 @@ class SyncRedis:
             self._connection_pool.close()
         self._connection_pool = None
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, *args):
-        self.close()
-
-    def __call__(self, *cmd):
-        return self._connection_pool(*cmd, **self._settings)
-
-    def connection(self, push=False):
-        wrapper = PushConnection if push else Connection
-        return wrapper(self._connection_pool, **self._settings)
-
-    def endpoints(self):
-        return self._connection_pool.endpoints()
-
-    def multiple_endpoints(self, *cmd, endpoints=True):
-        return self._connection_pool.multiple_endpoints(*cmd, endpoints=endpoints, **self._settings)
-
-    def modify(self, **kwargs):
-        settings = self._settings.copy()
-        settings.update(kwargs)
-        return SyncRedis(self._connection_pool, **settings)
-
-
-class Connection:
-    def __init__(self, pool, **kwargs):
-        self._pool = pool
-        self._conn = pool.connection(**kwargs)
+class ModifiedConnection:
+    def __init__(self, connection_pool, **kwargs):
+        self._connection_pool = connection_pool
+        self._settings = kwargs
 
     def __del__(self):
         self.close()
 
     def close(self):
-        self._conn.release(self._conn)
-        self._conn = None
-        self._pool = None
+        self._connection_pool = self._settings = None
 
     def __enter__(self):
         return self
@@ -113,10 +132,34 @@ class Connection:
     def __exit__(self, *args):
         self.close()
 
-    def __call__(self, *cmd):
-        return self._conn(*cmd)
+    def __call__(self, *cmd, **kwargs):
+        settings = merge_dicts(self._settings, kwargs)
+        if settings is None:
+            return self._conn(*cmd)
+        else:
+            return self._conn(*cmd, **settings)
+
+    def modify(self, **kwargs):
+        settings = self._settings.copy()
+        settings.update(kwargs)
+        return ModifiedConnection(self._connection_pool, **settings)
 
 
+class Connection(ModifiedConnection):
+    def __init__(self, connection_pool, **kwargs):
+        self._conn = connection_pool.connection(**kwargs)
+        super(Connection, self).__init__(connection_pool, **kwargs)
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._conn:
+            self._connection_pool.release(self._conn)
+        self._conn = None
+        self._connection_pool = None
+
+"""
 class PushConnection:
     def __init__(self, pool, **kwargs):
         self._pool = pool
@@ -127,8 +170,9 @@ class PushConnection:
 
     def close(self):
         # no good way in redis API to reset state of a connection
-        self._conn.close()
-        self._conn.release(self._conn)
+        if self._conn:
+            self._conn.close()
+            self._pool.release(self._conn)
         self._conn = None
         self._pool = None
 
@@ -149,3 +193,4 @@ class PushConnection:
 
     def __next__(self):
         return self._conn.next_message()
+"""

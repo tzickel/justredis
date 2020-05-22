@@ -162,7 +162,8 @@ class SyncClusterConnectionPool:
                 return self._last_connection.take()
             except:
                 self._last_connection = None
-        endpoints = self.endpoints()
+        ###endpoints = self.endpoints()
+        endpoints = [x[1] for x in self._slots]
         if not endpoints:
             endpoints = self._initial_addresses
         for address in endpoints:
@@ -228,23 +229,29 @@ class SyncClusterConnectionPool:
             return
         pool.release(conn)
 
-    def __call__(self, *cmd, _database=0):
-        if self._clustered == False:
-            conn = self.take()
+    def __call__(self, *cmd, endpoints=False, **kwargs):
+        if endpoints == 'masters':
+            # TODO send kwargs
+            return on_all_masters(*cmd)
+        elif endpoints != False:
+            raise ValueError('Only supported endpoints options is "masters" or False')
         else:
-            # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
-            conn = self.take_by_cmd(*cmd)
-        try:
-            return conn(*cmd, database=_database)
-        # TODO (document) PartialError response here won't handle those MOVED ?
-        except Error as e:
-            if e.args[0].startswith(b'MOVED '):
-                # TODO (misc) here is a case to reuse this connection instead of getting a new one inside _update_slots
-                self._update_slots()
-                return self(*cmd)
-            raise
-        finally:
-            self.release(conn)
+            if self._clustered == False:
+                conn = self.take()
+            else:
+                # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
+                conn = self.take_by_cmd(*cmd)
+            try:
+                return conn(*cmd, **kwargs)
+            # TODO (document) PartialError response here won't handle those MOVED ?
+            except Error as e:
+                if e.args[0].startswith(b'MOVED '):
+                    # TODO (misc) here is a case to reuse this connection instead of getting a new one inside _update_slots
+                    self._update_slots()
+                    return self(*cmd, **kwargs)
+                raise
+            finally:
+                self.release(conn)
 
     # TODO (documentation) because of MOVED semantics, it's best that on exception you should re-get a new cnonection each time (even on watch error)
     @contextmanager
@@ -266,7 +273,8 @@ class SyncClusterConnectionPool:
                 pass
             self.release(conn)
 
-    def on_all_masters(self, *cmd):
+    # TODO accept **kwargs !
+    def _on_all_masters(self, *cmd):
         if self._clustered == False:
             # TODO (correctness) fix the output to include the address
             return {'local': self(*cmd)}
@@ -283,6 +291,10 @@ class SyncClusterConnectionPool:
         return res
 
     # TODO (misc) thread safety
-    # TODO (correctness) if not clustered, return the ip still...
     def endpoints(self):
-        return [x[1] for x in self._slots]
+        if self._clustered is None:
+            self._update_slots()
+        if self._clustered:
+            return [(x[1], ['master']) for x in self._slots]
+        else:
+            return [(x, ['regular']) for x in self._initial_addresses]
