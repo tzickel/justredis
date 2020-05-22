@@ -232,7 +232,7 @@ class SyncClusterConnectionPool:
     def __call__(self, *cmd, endpoints=False, **kwargs):
         if endpoints == 'masters':
             # TODO send kwargs
-            return on_all_masters(*cmd)
+            return self._on_all_masters(*cmd)
         elif endpoints != False:
             raise ValueError('Only supported endpoints options is "masters" or False')
         else:

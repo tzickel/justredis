@@ -31,10 +31,8 @@ class SyncConnectionPool:
         self._connections_available.clear()
         self._limit = Semaphore(self._max_connections) if self._max_connections else None
 
-    def take(self, address=None):
+    def take(self):
         # TODO (correctness) cluster depends on this failing if closed !
-        if address is not None:
-            raise ValueError('ConnectionPool does not know to take an address')
         try:
             while True:
                 conn = self._connections_available.popleft()
@@ -57,8 +55,8 @@ class SyncConnectionPool:
     def release(self, conn):
         try:
             self._connections_in_use.remove(conn)
-        # If this fails, it's a connection from a previous cycle, don't reuse it
         # TODO (correctness) should we release the self._limit here as well ? (or just make close forever)
+        # If this fails, it's a connection from a previous cycle, don't reuse it
         except KeyError:
             conn.close()
             return
@@ -67,26 +65,29 @@ class SyncConnectionPool:
         elif self._limit is not None:
             self._limit.release()
 
-    def __call__(self, *cmd, _database=0):
+    def __call__(self, *cmd, **kwargs):
         conn = self.take()
         try:
-            return conn(*cmd, database=_database)
+            return conn(*cmd, **kwargs)
         finally:
             self.release(conn)
 
     @contextmanager
-    def connection(self, key, _database=0):
+    def connection(self, **kwargs):
         conn = self.take()
         try:
-            conn.set_database(_database)
             yield conn
         finally:
             # We need to clean up the connection back to a normal state.
             try:
                 conn._command(b'DISCARD')
-            except Error:
+            except Exception:
                 pass
             self.release(conn)
 
-    def on_all_masters(*cmd):
-        raise NotImplementedError('This function only works in clusters')
+    def endpoints(self):
+        conn = self.take()
+        try:
+            return [(conn.peername(), ['regular'])]
+        finally:
+            self.release(conn)

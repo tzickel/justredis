@@ -147,7 +147,8 @@ class ModifiedConnection:
 
 class Connection(ModifiedConnection):
     def __init__(self, connection_pool, **kwargs):
-        self._conn = connection_pool.connection(**kwargs)
+        self._conn_context = connection_pool.connection(**kwargs)
+        self._conn = self._conn_context.__enter__()
         super(Connection, self).__init__(connection_pool, **kwargs)
 
     def __del__(self):
@@ -155,37 +156,19 @@ class Connection(ModifiedConnection):
 
     def close(self):
         if self._conn:
-            self._connection_pool.release(self._conn)
+            self._conn_context.__exit__()
         self._conn = None
         self._connection_pool = None
+        self._conn_context = None
 
-"""
-class PushConnection:
-    def __init__(self, pool, **kwargs):
-        self._pool = pool
-        self._conn = pool.connection(**kwargs)
 
-    def __del__(self):
-        self.close()
-
-    def close(self):
-        # no good way in redis API to reset state of a connection
-        if self._conn:
-            self._conn.close()
-            self._pool.release(self._conn)
-        self._conn = None
-        self._pool = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
+class PushConnection(Connection):
     def __call__(self, *cmd, **kwargs):
+        # TODO handle **kwargs and merge dict
         return self._conn.push_command(*cmd)
 
     def next_message(self, timeout=None, **kwargs):
+        # TODO handle **kwargs and merge dict
         return self._conn.next_message(timeout=timeout, **kwargs)
 
     def __iter__(self):
@@ -193,4 +176,3 @@ class PushConnection:
 
     def __next__(self):
         return self._conn.next_message()
-"""

@@ -32,7 +32,7 @@ def test_simple(client):
     assert client('set', '{a}b', 'd') == b'OK'
     assert client('get', 'a') == b'a'
     try:
-        with client.database(1).connection('a') as c:
+        with client.modify(database=1).connection('a') as c:
             c('set', 'a', 'a') == b'OK'
     except Error as e:
         if e.args[0] == b'ERR SELECT is not allowed in cluster mode':
@@ -149,7 +149,7 @@ def test_server(client):
     client('set', 'cluster_bb', 'b') == b'OK'
     client('set', 'cluster_cc', 'c') == b'OK'
     # TODO this is bad, return ips
-    result = client.on_all_masters('keys', 'cluster_*')
+    result = client('keys', 'cluster_*', endpoints='masters')
     # TODO check both cluster and not cluster
     if len(result) == 1:
         result = list(result.values())
@@ -165,7 +165,7 @@ def test_moved(client):
     client('set', 'aa', 'a') == b'OK'
     client('set', 'bb', 'b') == b'OK'
     client('set', 'cc', 'c') == b'OK'
-    result = client.on_all_masters('get', 'aa')
+    result = client('get', 'aa', endpoints='masters')
     if len(result) == 1:
         result = list(result.values())
         assert result == [b'a']
