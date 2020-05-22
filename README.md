@@ -22,9 +22,8 @@ If you configured the client to decode the results as unicode strings, but you w
 
 Roadmap
 ---
-Async support with the same exact API (but with the await keyword), currently for asyncio
+Asynchronous I/O support with the same exact API (but with the await keyword)
 Transparent EVAL script caching
-More cluster features (both master, and replicas)
 Clear seperation between the I/O and concurrency code to the rest
 
 Should allow for easy portablity to other event loops such as gevent, and async ones such as asyncio and trio.
