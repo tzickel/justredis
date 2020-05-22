@@ -41,7 +41,9 @@ class ModifiedRedis:
         else:
             return self._connection_pool(*cmd, **settings)
 
-    def connection(self, push=False, **kwargs):
+    def connection(self, *cmds, push=False, **kwargs):
+        if cmds:
+            raise Exception('Please specify the key')
         wrapper = PushConnection if push else Connection
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:

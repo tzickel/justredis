@@ -23,7 +23,7 @@ def redis_cluster_with_client(dockerimage='redis', extraparams=''):
         import time
         wait = 50
         while wait:
-            result = r.on_all_masters(b'CLUSTER', b'INFO')
+            result = r(b'CLUSTER', b'INFO', endpoints='masters')
             ready = True
             for res in result.values():
                 if b'cluster_state:ok' not in res:

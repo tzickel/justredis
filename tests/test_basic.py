@@ -32,7 +32,7 @@ def test_simple(client):
     assert client('set', '{a}b', 'd') == b'OK'
     assert client('get', 'a') == b'a'
     try:
-        with client.modify(database=1).connection('a') as c:
+        with client.modify(database=1).connection(key='a') as c:
             c('set', 'a', 'a') == b'OK'
     except Error as e:
         if e.args[0] == b'ERR SELECT is not allowed in cluster mode':
@@ -78,7 +78,7 @@ def test_eval(client):
 
 # TODO (misc) add some extra checks here for invalid states
 def test_multi(client):
-    with client.connection('a') as c:
+    with client.connection(key='a') as c:
         c('multi')
         c('set', 'a', 'b')
         c('get', 'a')
@@ -86,17 +86,17 @@ def test_multi(client):
 
     # TODO (misc) kinda lame
     try:
-        with client.database(2).connection('a') as c1:
+        with client.modify(database=2).connection(key='a') as c1:
             c1('multi')
             c1('set', 'a', 'b')
-            with client.database(3).connection('a') as c2:
+            with client.modify(database=3).connection(key='a') as c2:
                 c2('multi')
                 c2('set', 'a1', 'c')
                 c2('get', 'a')
                 assert c2('exec') == [b'OK', None]
             c1('mget', 'a', 'a1')
             assert c1('exec') == [b'OK', [b'b', None]]
-        assert client.database(2)('get', 'a') == b'b'
+        assert client.modify(database=2)('get', 'a') == b'b'
     except Error as e:
         if e.args[0] == b'ERR SELECT is not allowed in cluster mode':
             pass
@@ -105,7 +105,7 @@ def test_multi(client):
 
 
 def test_multidiscard(client):
-    with client.connection('a') as c:
+    with client.connection(key='a') as c:
         c('multi')
         with pytest.raises(Error):
             c('nothing')
@@ -116,11 +116,9 @@ def test_multidiscard(client):
 
 
 def test_pubsub(client):
-    with client.pubsub() as pubsub:
-        with pytest.raises(Exception):
-            pubsub.next_message()
-        pubsub.subscribe('hi')
-        pubsub.psubscribe(b'bye')
+    with client.connection(push=True) as pubsub:
+        pubsub('subscribe', 'hi')
+        pubsub('psubscribe', b'bye')
         assert pubsub.next_message() == [b'subscribe', b'hi', 1]
         assert pubsub.next_message() == [b'psubscribe', b'bye', 2]
         assert pubsub.next_message(0.1) == None
@@ -128,12 +126,12 @@ def test_pubsub(client):
         assert pubsub.next_message(0.1) == [b'message', b'hi', b'there']
         client('publish', 'bye', 'there')
         assert pubsub.next_message(0.1) == [b'pmessage', b'bye', b'bye', b'there']
-        pubsub.ping()
+        pubsub('ping')
         # RESP2 and RESP3 behave differently here, so check for both
         assert pubsub.next_message() in (b'PONG', [b'pong', b''])
-        pubsub.ping(b'hi')
+        pubsub('ping', b'hi')
         assert pubsub.next_message() in (b'hi', [b'pong', b'hi'])
-        pubsub.unsubscribe('hi')
+        pubsub('unsubscribe', 'hi')
 
 
 def test_misc(client):

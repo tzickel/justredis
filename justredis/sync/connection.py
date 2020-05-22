@@ -159,11 +159,11 @@ class SyncConnection:
             raise Exception()
         self.set_database(database)
         if is_multiple_commands(*cmd):
-            return self._commands(*cmd)
+            return self._commands(*cmd, **kwargs)
         else:
-            return self._command(*cmd)
+            return self._command(*cmd, **kwargs)
 
-    def _command(self, *cmd):
+    def _command(self, *cmd, **kwargs):
         cmd, encoder, decoder, attributes = get_command(*cmd)
         if get_command_name(cmd) in not_allowed_commands:
             raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
@@ -176,7 +176,7 @@ class SyncConnection:
             raise TimeoutError()
         return res
 
-    def _commands(self, *cmds):
+    def _commands(self, *cmds, **kwargs):
         send = []
         recv = []
         for cmd in cmds:

@@ -255,14 +255,13 @@ class SyncClusterConnectionPool:
 
     # TODO (documentation) because of MOVED semantics, it's best that on exception you should re-get a new cnonection each time (even on watch error)
     @contextmanager
-    def connection(self, key, _database=0):
-        if self._clustered == False:
+    def connection(self, key=None, **kwargs):
+        if self._clustered == False or key is None:
             conn = self.take()
         else:
             # TODO (misc) defend against _database != 0
             conn = self.take_by_key(key)
         try:
-            conn.set_database(_database)
             # TODO handle MOVED error here
             yield conn
         finally:
@@ -283,6 +282,9 @@ class SyncClusterConnectionPool:
         res = {}
         # TODO (correctness) if this loop fails, catch and return partial error... just like multiple concurrent commands
         for address in self.endpoints():
+            if 'master' not in address[1]:
+                continue
+            address = address[0]
             conn = self.take(address)
             try:
                 res[address] = conn(*cmd)
