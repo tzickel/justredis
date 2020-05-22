@@ -62,8 +62,8 @@ class ModifiedRedis:
         return ModifiedRedis(self._connection_pool, **settings)
 
 
-# TODO get callback when slots have changes (maybe listen to other connections?) (or invalidate open connections)
-# TODO allow MRO registration for spealized commands !
+# TODO (misc) should we implement an callback for when slots have changed ?
+# TODO (misc) allow some registration method for speacialized commands ?
 class SyncRedis(ModifiedRedis):
     @classmethod
     def from_url(cls, url, **kwargs):
@@ -108,6 +108,7 @@ class SyncRedis(ModifiedRedis):
             pool_factory = SyncConnectionPool
         elif pool_factory == 'auto':
             pool_factory = SyncClusterConnectionPool
+        # TODO (misc) do I need to pass **kwargs here in the end ? (are there options which can do that?)
         super(SyncRedis, self).__init__(pool_factory(**kwargs), **kwargs)
 
     def __del__(self):
@@ -167,12 +168,18 @@ class Connection(ModifiedConnection):
 
 class PushConnection(Connection):
     def __call__(self, *cmd, **kwargs):
-        # TODO handle **kwargs and merge dict
-        return self._connection.push_command(*cmd)
+        settings = merge_dicts(self._settings, kwargs)
+        if settings is None:
+            return self._connection.push_command(*cmd)
+        else:
+            return self._connection.push_command(*cmd, **settings)
 
     def next_message(self, timeout=None, **kwargs):
-        # TODO handle **kwargs and merge dict
-        return self._connection.pushed_message(timeout=timeout, **kwargs)
+        settings = merge_dicts(self._settings, kwargs)
+        if settings is None:
+            return self._connection.pushed_message(timeout=timeout)
+        else:
+            return self._connection.pushed_message(timeout=timeout, **settings)
 
     def __iter__(self):
         return self

@@ -18,11 +18,12 @@ def calc_hashslot(key):
     return crc_hqx(key, 0) % 16384
 
 
-# TODO (misc) I think I covered the multithreading sensetive parts, make sure
+# TODO (correctness) I think I covered the multithreading sensetive parts, make sure
 # TODO (misc) should I lazely check if there is a cluster ? (i.e. upgrade from a default connectionpool first)
-# TODO (misc) add ASKING
-# TODO (misc) make sure I dont have an issue where if there is a connection pool limit, I can get into a deadlock here
+# TODO (correctness) add ASKING
+# TODO (correctness) make sure I dont have an issue where if there is a connection pool limit, I can get into a deadlock here
 # TODO (misc) future optimization, if we can't take from last_connection beacuse of connection pool limit, choose another random one.
+# TODO (correctness), disable encoding on all of conn commands
 
 
 class SyncClusterConnectionPool:
@@ -59,8 +60,7 @@ class SyncClusterConnectionPool:
         conn = self.take()
         try:
             try:
-                # TODO (correctness), disable encoding on all of conn commands
-                slots = conn({'command': (b'CLUSTER', b'SLOTS'), 'attributes': False})
+                slots = conn(b'CLUSTER', b'SLOTS', attributes=False, decode=None)
                 self._clustered = True
             except Error:
                 slots = []

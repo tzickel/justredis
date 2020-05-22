@@ -136,7 +136,7 @@ class SyncConnection:
             self.close()
             raise CommunicationError() from e
 
-    def pushed_message(self, timeout=False, decoder=None):
+    def pushed_message(self, timeout=False, decoder=None, **kwargs):
         res = self._recv(timeout, decoder)
         if res == timeout_error:
             return None
@@ -144,7 +144,7 @@ class SyncConnection:
 
     # TODO (api) should have encoding as well ?
     # TODO (misc) don't accept multiple commands here
-    def push_command(self, *cmd):
+    def push_command(self, *cmd, **kwargs):
         self._send(*cmd)
 
     def set_database(self, database):
@@ -154,17 +154,24 @@ class SyncConnection:
 
     # TODO (correctness) if we see SELECT we should update it manually !
     # TODO handle **kwargs database, what else ?
-    def __call__(self, *cmd, database=0, **kwargs):
+    def __call__(self, *cmd, database=None, **kwargs):
         if not cmd:
             raise Exception()
-        self.set_database(database)
+        if database is not None:
+            self.set_database(database)
         if is_multiple_commands(*cmd):
             return self._commands(*cmd, **kwargs)
         else:
             return self._command(*cmd, **kwargs)
 
-    def _command(self, *cmd, **kwargs):
-        cmd, encoder, decoder, attributes = get_command(*cmd)
+    def _command(self, *cmd, encoder=None, decoder=None, attributes=None, **kwargs):
+        cmd, _encoder, _decoder, _attributes = get_command(*cmd)
+        if _encoder is not None:
+            encoder = _encoder
+        if _decoder is not None:
+            decoder = _decoder
+        if _attributes is not None:
+            attributes = _attributes
         if get_command_name(cmd) in not_allowed_commands:
             raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
         self._send(*cmd, encoder=encoder)
