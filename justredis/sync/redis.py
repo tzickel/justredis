@@ -45,9 +45,11 @@ class ModifiedRedis:
         wrapper = PushConnection if push else Connection
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
-            return wrapper(self._connection_pool)
+            conn = self._connection_pool.connection()
+            return wrapper(conn)
         else:
-            return wrapper(self._connection_pool, **settings)
+            conn = self._connection_pool.connection(**settings)
+            return wrapper(conn, **settings)
 
     def endpoints(self):
         return self._connection_pool.endpoints()
@@ -116,15 +118,15 @@ class SyncRedis(ModifiedRedis):
 
 
 class ModifiedConnection:
-    def __init__(self, connection_pool, **kwargs):
-        self._connection_pool = connection_pool
+    def __init__(self, connection, **kwargs):
+        self._connection = connection
         self._settings = kwargs
 
     def __del__(self):
         self.close()
 
     def close(self):
-        self._connection_pool = self._settings = None
+        self._connection = self._settings = None
 
     def __enter__(self):
         return self
@@ -135,44 +137,43 @@ class ModifiedConnection:
     def __call__(self, *cmd, **kwargs):
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
-            return self._conn(*cmd)
+            return self._connection(*cmd)
         else:
-            return self._conn(*cmd, **settings)
+            return self._connection(*cmd, **settings)
 
     def modify(self, **kwargs):
         settings = self._settings.copy()
         settings.update(kwargs)
-        return ModifiedConnection(self._connection_pool, **settings)
+        return ModifiedConnection(self._connection, **settings)
 
 
 class Connection(ModifiedConnection):
-    def __init__(self, connection_pool, **kwargs):
-        self._conn_context = connection_pool.connection(**kwargs)
-        self._conn = self._conn_context.__enter__()
-        super(Connection, self).__init__(connection_pool, **kwargs)
+    def __init__(self, connection, **kwargs):
+        self._connection_context = connection
+        super(Connection, self).__init__(connection.__enter__(), **kwargs)
 
     def __del__(self):
         self.close()
 
     def close(self):
-        if self._conn:
-            self._conn_context.__exit__()
-        self._conn = None
-        self._connection_pool = None
-        self._conn_context = None
+        if self._connection_context:
+            self._connection_context.__exit__(None, None, None)
+        self._connection = None
+        self._connection_context = None
+        self._settings = None
 
 
 class PushConnection(Connection):
     def __call__(self, *cmd, **kwargs):
         # TODO handle **kwargs and merge dict
-        return self._conn.push_command(*cmd)
+        return self._connection.push_command(*cmd)
 
     def next_message(self, timeout=None, **kwargs):
         # TODO handle **kwargs and merge dict
-        return self._conn.next_message(timeout=timeout, **kwargs)
+        return self._connection.pushed_message(timeout=timeout, **kwargs)
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        return self._conn.next_message()
+        return self._connection.pushed_message()
