@@ -8,19 +8,31 @@ def parse_url(url):
     result = urlparse(url)
     res = {}
 
-    if result.scheme == 'redis':
+    if result.scheme == "redis":
         pass
-    elif result.scheme == 'redis-socket' or result.scheme == 'unix':
-        res['socket_factory'] = 'unix'
+    elif result.scheme == "redis-socket" or result.scheme == "unix":
+        res["socket_factory"] = "unix"
     else:
-        raise NotImplementedError('Not implmented connection scheme: %s' % result.scheme)
+        raise NotImplementedError("Not implmented connection scheme: %s" % result.scheme)
 
     if result.username:
-        res['username'] = result.username
+        res["username"] = result.username
     if result.password:
-        res['password'] = result.password
+        res["password"] = result.password
 
     return res
+
+
+def merge_dicts(parent, child):
+    if not parent and not child:
+        return None
+    elif not parent:
+        return child
+    elif not child:
+        return parent
+    tmp = parent.copy()
+    tmp.update(child)
+    return tmp
 
 
 # TODO (misc) can we do all those commands better, maybe with a special class for CustomCommand parameters?
@@ -42,6 +54,6 @@ def is_multiple_commands(*cmd):
 def get_command(*cmd):
     if isinstance(cmd[0], dict):
         cmd = cmd[0]
-        return cmd['command'], cmd.get('encoder', None), cmd.get('decoder', None), cmd.get('attributes', None)
+        return cmd["command"], cmd.get("encoder", None), cmd.get("decoder", None), cmd.get("attributes", None)
     else:
         return cmd, None, None, None

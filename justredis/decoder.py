@@ -13,7 +13,7 @@ from .errors import ProtocolError
 class Buffer:
     def __init__(self):
         self._buffer = bytearray()
-    
+
     def append(self, data):
         self._buffer += data
 
@@ -22,16 +22,16 @@ class Buffer:
 
     def skip_if_startswith(self, data):
         if self._buffer.startswith(data):
-            del self._buffer[:len(data)]
+            del self._buffer[: len(data)]
             return True
         return False
 
     def takeline(self):
-        idx = self._buffer.find(b'\r\n')
+        idx = self._buffer.find(b"\r\n")
         if idx == -1:
             return None
         ret = self._buffer[:idx]
-        del self._buffer[:idx + 2]
+        del self._buffer[: idx + 2]
         return ret
 
     def take(self, nbytes):
@@ -51,11 +51,11 @@ class Result:
     def __init__(self, data, attr=None):
         self.data = data
         self.attr = attr
-    
+
     def __repr__(self):
-        rep = '%s: %s ' % (type(self).__name__, self.data)
+        rep = "%s: %s " % (type(self).__name__, self.data)
         if self.attr:
-            rep += '[%s]' % self.attr
+            rep += "[%s]" % self.attr
         return rep
 
 
@@ -118,7 +118,7 @@ def parse_decoding(decoding):
     elif isinstance(decoding, dict):
         return lambda x, decoding=deconding: x.decode(**decoding)
     else:
-        raise ValueError('Invalid decoding: %r' % decoding)
+        raise ValueError("Invalid decoding: %r" % decoding)
 
 
 class RedisRespDecoder:
@@ -187,7 +187,7 @@ class RedisRespDecoder:
                     msg_type = Push
                     msg = last_array[1]
                 else:
-                    raise ProtocolError('Unknown aggregate type')
+                    raise ProtocolError("Unknown aggregate type")
 
                 # If it's an attribute, nothing to do
                 if last_array[2] == 3:
@@ -201,26 +201,25 @@ class RedisRespDecoder:
                         if self._with_attributes:
                             msg = msg_type(msg, last_array[3])
                         # For now this isn't done, since we handle Push in unique connections
-                        #elif msg_type is Push:
-                            #msg = msg_type(msg)
+                        # elif msg_type is Push:
+                        # msg = msg_type(msg)
                         tmp[1].append(msg)
                         last_array = tmp
                     else:
                         if self._with_attributes:
                             msg = msg_type(msg, last_array[3])
                         # For now this isn't done, since we handle Push in unique connections
-                        #elif msg_type is Push:
-                            #msg = msg_type(msg)
+                        # elif msg_type is Push:
+                        # msg = msg_type(msg)
                         last_array = None
                         yield msg
-
 
             # General RESP3 parsing
             while len(buffer) == 0:
                 yield _need_more_data
 
             # Simple string
-            if buffer.skip_if_startswith(b'+'):
+            if buffer.skip_if_startswith(b"+"):
                 msg_type = String
                 while True:
                     msg = buffer.takeline()
@@ -229,7 +228,7 @@ class RedisRespDecoder:
                     yield _need_more_data
                 msg = self._decoder(msg)
             # Simple error
-            elif buffer.skip_if_startswith(b'-'):
+            elif buffer.skip_if_startswith(b"-"):
                 msg_type = Error
                 while True:
                     # TODO (misc) decode to string as well ?
@@ -239,7 +238,7 @@ class RedisRespDecoder:
                     yield _need_more_data
                 msg = bytes(msg)
             # Number
-            elif buffer.skip_if_startswith(b':'):
+            elif buffer.skip_if_startswith(b":"):
                 msg_type = Number
                 while True:
                     msg = buffer.takeline()
@@ -248,7 +247,7 @@ class RedisRespDecoder:
                     yield _need_more_data
                 msg = int(msg)
             # Blob string and Verbatim string
-            elif buffer.skip_if_startswith(b'$') or buffer.skip_if_startswith(b'='):
+            elif buffer.skip_if_startswith(b"$") or buffer.skip_if_startswith(b"="):
                 msg_type = String
                 while True:
                     length = buffer.takeline()
@@ -256,7 +255,7 @@ class RedisRespDecoder:
                         break
                     yield _need_more_data
                 # Streamed string
-                if length == b'?':
+                if length == b"?":
                     chunks = []
                     while True:
                         while True:
@@ -275,7 +274,7 @@ class RedisRespDecoder:
                             yield _need_more_data
                         chunks.append(buffer.take(chunk_size))
                         buffer.skip(2)
-                    msg = self._decoder(b''.join(chunks))
+                    msg = self._decoder(b"".join(chunks))
                     chunks = None
                 else:
                     length = int(length)
@@ -290,14 +289,14 @@ class RedisRespDecoder:
                         msg = self._decoder(buffer.take(length))
                         buffer.skip(2)
             # Array
-            elif buffer.skip_if_startswith(b'*'):
+            elif buffer.skip_if_startswith(b"*"):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
                         break
                     yield _need_more_data
                 # Streamed array
-                if length == b'?':
+                if length == b"?":
                     length = None
                 else:
                     length = int(length)
@@ -311,14 +310,14 @@ class RedisRespDecoder:
                     last_attribute = None
                     continue
             # Set
-            elif buffer.skip_if_startswith(b'~'):
+            elif buffer.skip_if_startswith(b"~"):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
                         break
                     yield _need_more_data
                 # Streamed set
-                if length == b'?':
+                if length == b"?":
                     length = None
                 else:
                     length = int(length)
@@ -332,7 +331,7 @@ class RedisRespDecoder:
                     last_attribute = None
                     continue
             # Null
-            elif buffer.skip_if_startswith(b'_'):
+            elif buffer.skip_if_startswith(b"_"):
                 msg_type = Null
                 while True:
                     line = buffer.takeline()
@@ -342,7 +341,7 @@ class RedisRespDecoder:
                 assert len(line) == 0
                 msg = None
             # Double
-            elif buffer.skip_if_startswith(b','):
+            elif buffer.skip_if_startswith(b","):
                 msg_type = Double
                 while True:
                     msg = buffer.takeline()
@@ -351,19 +350,19 @@ class RedisRespDecoder:
                     yield _need_more_data
                 msg = float(msg)
             # Boolean
-            elif buffer.skip_if_startswith(b'#'):
+            elif buffer.skip_if_startswith(b"#"):
                 msg_type = Boolean
                 while True:
                     msg = buffer.takeline()
                     if msg is not None:
                         break
                     yield _need_more_data
-                if msg == b't':
+                if msg == b"t":
                     msg = True
-                elif msg == b'f':
+                elif msg == b"f":
                     msg = False
             # Blob error
-            elif buffer.skip_if_startswith(b'!'):
+            elif buffer.skip_if_startswith(b"!"):
                 msg_type = Error
                 while True:
                     length = buffer.takeline()
@@ -383,7 +382,7 @@ class RedisRespDecoder:
                     buffer.skip(2)
                     msg = bytes(msg)
             # Big number
-            elif buffer.skip_if_startswith(b'('):
+            elif buffer.skip_if_startswith(b"("):
                 msg_type = BigNumber
                 while True:
                     msg = buffer.takeline()
@@ -391,14 +390,14 @@ class RedisRespDecoder:
                         break
                     yield _need_more_data
             # Map
-            elif buffer.skip_if_startswith(b'%'):
+            elif buffer.skip_if_startswith(b"%"):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
                         break
                     yield _need_more_data
                 # Streamed map
-                if length == b'?':
+                if length == b"?":
                     length = None
                 else:
                     length = int(length) * 2
@@ -412,7 +411,7 @@ class RedisRespDecoder:
                     last_attribute = None
                     continue
             # Attribute
-            elif buffer.skip_if_startswith(b'|'):
+            elif buffer.skip_if_startswith(b"|"):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
@@ -428,7 +427,7 @@ class RedisRespDecoder:
                     last_array = [length, [], 3]
                     continue
             # Push
-            elif buffer.skip_if_startswith(b'>'):
+            elif buffer.skip_if_startswith(b">"):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
@@ -445,18 +444,18 @@ class RedisRespDecoder:
                     last_attribute = None
                     continue
             # End of streaming aggregate type
-            elif buffer.skip_if_startswith(b'.'):
+            elif buffer.skip_if_startswith(b"."):
                 while True:
                     tmp = buffer.takeline()
                     if tmp is not None:
                         break
                     yield _need_more_data
-                assert tmp == b''
+                assert tmp == b""
                 assert last_array[0] == None
                 last_array[0] = len(last_array[1])
                 continue
             else:
-                raise ProtocolError('Unknown type: %s' % bytes(buffer.take(1)).decode())
+                raise ProtocolError("Unknown type: %s" % bytes(buffer.take(1)).decode())
 
             # Handle legacy RESP2 Null
             if msg is None and msg_type is not Null:
@@ -532,7 +531,7 @@ class RedisResp2Decoder:
                 yield _need_more_data
 
             # Simple string
-            if buffer.skip_if_startswith(b'+'):
+            if buffer.skip_if_startswith(b"+"):
                 msg_type = String
                 while True:
                     msg = buffer.takeline()
@@ -541,7 +540,7 @@ class RedisResp2Decoder:
                     yield _need_more_data
                 msg = self._decoder(msg)
             # Simple error
-            elif buffer.skip_if_startswith(b'-'):
+            elif buffer.skip_if_startswith(b"-"):
                 msg_type = Error
                 while True:
                     # TODO (misc) decode to string as well ?
@@ -551,7 +550,7 @@ class RedisResp2Decoder:
                     yield _need_more_data
                 msg = bytes(msg)
             # Number
-            elif buffer.skip_if_startswith(b':'):
+            elif buffer.skip_if_startswith(b":"):
                 msg_type = Number
                 while True:
                     msg = buffer.takeline()
@@ -560,7 +559,7 @@ class RedisResp2Decoder:
                     yield _need_more_data
                 msg = int(msg)
             # Blob string
-            elif buffer.skip_if_startswith(b'$'):
+            elif buffer.skip_if_startswith(b"$"):
                 msg_type = String
                 while True:
                     length = buffer.takeline()
@@ -579,7 +578,7 @@ class RedisResp2Decoder:
                     msg = self._decoder(buffer.take(length))
                     buffer.skip(2)
             # Array
-            elif buffer.skip_if_startswith(b'*'):
+            elif buffer.skip_if_startswith(b"*"):
                 while True:
                     length = buffer.takeline()
                     if length is not None:
@@ -595,7 +594,7 @@ class RedisResp2Decoder:
                     last_array = [length, [], 0, None]
                     continue
             else:
-                raise ProtocolError('Unknown RESP2 type: %s' % bytes(buffer.take(1)).decode())
+                raise ProtocolError("Unknown RESP2 type: %s" % bytes(buffer.take(1)).decode())
 
             if self._with_attributes:
                 msg = msg_type(msg, None)

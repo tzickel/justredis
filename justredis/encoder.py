@@ -4,19 +4,20 @@ from collections import deque
 # TODO (api) should I wrap the ValueError in a RedisError ?
 
 
-def encode(encoding='utf-8', errors='strict'):
+def encode(encoding="utf-8", errors="strict"):
     def encode_with_encoding(inp, encoding=encoding, errors=errors):
         if isinstance(inp, (bytes, bytearray, memoryview)):
             return inp
         elif isinstance(inp, str):
             return inp.encode(encoding, errors)
         elif isinstance(inp, bool):
-            raise ValueError('Invalid input for encoding')
+            raise ValueError("Invalid input for encoding")
         elif isinstance(inp, int):
-            return b'%d' % inp
+            return b"%d" % inp
         elif isinstance(inp, float):
-            return b'%r' % inp
-        raise ValueError('Invalid input for encoding')
+            return b"%r" % inp
+        raise ValueError("Invalid input for encoding")
+
     return encode_with_encoding
 
 
@@ -33,7 +34,7 @@ def parse_encoding(encoding):
     elif isinstance(encoding, dict):
         return encode(**encoding)
     else:
-        raise ValueError('Invalid encoding: %r' % encoding)
+        raise ValueError("Invalid encoding: %r" % encoding)
 
 
 class RedisRespEncoder:
@@ -49,7 +50,7 @@ class RedisRespEncoder:
         cutoff_size = self._cutoff_size
         if cutoff_size and (self._uncompressed_length > cutoff_size or data_length > cutoff_size):
             if self._uncompressed_length:
-                chunk = b''.join(self._uncompressed_chunks)
+                chunk = b"".join(self._uncompressed_chunks)
                 self._uncompressed_chunks.clear()
                 self._uncompressed_length = 0
                 self._compressed_chunks.append(chunk)
@@ -65,20 +66,20 @@ class RedisRespEncoder:
     def encode(self, *cmd, encoder=None):
         _add_data = self._add_data
         encoder = self._encoder if encoder is None else parse_encoding(encoder)
-        _add_data(b'*%d\r\n' % len(cmd))
+        _add_data(b"*%d\r\n" % len(cmd))
         for arg in cmd:
             arg = encoder(arg)
             if isinstance(arg, memoryview):
                 length = arg.nbytes
             else:
                 length = len(arg)
-            _add_data(b'$%d\r\n' % length)
+            _add_data(b"$%d\r\n" % length)
             _add_data(arg)
-            _add_data(b'\r\n')
-    
+            _add_data(b"\r\n")
+
     def extract(self):
         self._uncompressed_length = 0
-        ret = b''.join(self._compressed_chunks) + b''.join(self._uncompressed_chunks)
+        ret = b"".join(self._compressed_chunks) + b"".join(self._uncompressed_chunks)
         if ret:
             self._compressed_chunks.clear()
             self._uncompressed_chunks.clear()
@@ -91,7 +92,7 @@ class RedisRespEncoder:
             if len(self._uncompressed_chunks) == 1:
                 return self._uncompressed_chunks.popleft()
             else:
-                ret = b''.join(self._uncompressed_chunks)
+                ret = b"".join(self._uncompressed_chunks)
                 self._uncompressed_chunks.clear()
                 return ret
         return None
@@ -110,17 +111,17 @@ class RedisRespEncoder:
     def encode(self, *cmd, encoder=None):
         _add_data = self._chunks.append
         encoder = self._encoder if encoder is None else parse_encoding(encoder)
-        _add_data(b'*%d\r\n' % len(cmd))
+        _add_data(b"*%d\r\n" % len(cmd))
         for arg in cmd:
             arg = encoder(arg)
             if isinstance(arg, memoryview):
                 length = arg.nbytes
             else:
                 length = len(arg)
-            _add_data(b'$%d\r\n' % length)
+            _add_data(b"$%d\r\n" % length)
             _add_data(arg)
-            _add_data(b'\r\n')
-    
+            _add_data(b"\r\n")
+
     def extract(self):
         length = 0
         ret = []
@@ -131,7 +132,7 @@ class RedisRespEncoder:
                 elif len(ret) == 1:
                     return ret[0]
                 else:
-                    return b''.join(ret)
+                    return b"".join(ret)
             item = self._chunks.popleft()
             item_len = len(item)
             if item_len > self._cutoff_size:
@@ -139,7 +140,7 @@ class RedisRespEncoder:
                     return item
                 else:
                     self._chunks.appendleft(item)
-                    return b''.join(ret)
+                    return b"".join(ret)
             else:
                 ret.append(item)
                 length += item_len

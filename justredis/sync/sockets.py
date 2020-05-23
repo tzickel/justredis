@@ -3,17 +3,17 @@ import sys
 import ssl
 
 
-platform = ''
-if sys.platform.startswith('linux'):
-    platform = 'linux'
-elif sys.platform.startswith('darwin'):
-    platform = 'darwin'
-elif sys.platform.startswith('win'):
-    platform = 'windows'
+platform = ""
+if sys.platform.startswith("linux"):
+    platform = "linux"
+elif sys.platform.startswith("darwin"):
+    platform = "darwin"
+elif sys.platform.startswith("win"):
+    platform = "windows"
 
 
 class SyncSocketWrapper:
-    def __init__(self, buffersize=2**16, **kwargs):
+    def __init__(self, buffersize=2 ** 16, **kwargs):
         self._buffer = bytearray(buffersize)
         self._view = memoryview(self._buffer)
         self._create(**kwargs)
@@ -23,8 +23,8 @@ class SyncSocketWrapper:
 
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=None, **kwargs):
         if address is None:
-            address = ('localhost', 6379)
-        sock = socket.create_connection(address, connect_timeout)
+            address = ("localhost", 6379)
+        sock = socket.create_connection(address, connect_timeout) # ASYNC
         sock.settimeout(socket_timeout)
 
         if tcp_nodelay is not None:
@@ -34,30 +34,29 @@ class SyncSocketWrapper:
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 0)
         if tcp_keepalive:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-            if platform == 'linux':
+            if platform == "linux":
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, tcp_keepalive)
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, tcp_keepalive // 3)
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
-            elif platform == 'darwin':
+            elif platform == "darwin":
                 sock.setsockopt(socket.IPPROTO_TCP, 0x10, tcp_keepalive // 3)
-            elif platform == 'windows':
+            elif platform == "windows":
                 sock.ioctl(socket.SIO_KEEPALIVE_VALS, (1, tcp_keepalive * 1000, tcp_keepalive // 3 * 1000))
         self._socket = sock
 
     def send(self, data):
-        #self._socket.sendmsg(data)
-        self._socket.sendall(data)
+        self._socket.sendall(data) # ASYNC
 
     def recv(self, timeout=False):
         if timeout is not False:
             old_timeout = self._socket.gettimeout()
             self._socket.settimeout(timeout)
             try:
-                r = self._socket.recv_into(self._buffer)
+                r = self._socket.recv_into(self._buffer) # ASYNC
             finally:
                 self._socket.settimeout(old_timeout)
         else:
-            r = self._socket.recv_into(self._buffer)
+            r = self._socket.recv_into(self._buffer) # ASYNC
         return self._view[:r]
 
     def peername(self):
@@ -70,10 +69,10 @@ class SyncSocketWrapper:
 class SyncUnixDomainSocketWrapper(SyncSocketWrapper):
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, **kwargs):
         if address is None:
-            address = '/tmp/redis.sock'
+            address = "/tmp/redis.sock"
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.settimeout(connect_timeout)
-        self._socket.connect(address)
+        self._socket.connect(address) # ASYNC
         self._socket.settimeout(socket_timeout)
 
 
@@ -84,7 +83,7 @@ class SyncSslSocketWrapper(SyncSocketWrapper):
     def _create(self, address=None, ssl_context=None, **kwargs):
         super(SyncSslSocketWrapper, self).__init__(address=address, **kwargs)
         if address is None:
-            address = ('localhost', 6379)
+            address = ("localhost", 6379)
         if ssl_context is None:
             ssl_context = ssl.create_default_context()
         self._socket = ssl_context.wrap_socket(self._socket, server_hostname=address[0])

@@ -1,8 +1,7 @@
-# binascii requires python to be compiled with zlib ?
 from binascii import crc_hqx
-from threading import Lock
 from contextlib import contextmanager
 
+from .environment import get_environment
 from .connectionpool import SyncConnectionPool
 from ..decoder import Error
 from ..utils import is_multiple_commands
@@ -10,11 +9,11 @@ from ..encoder import parse_encoding
 
 
 def calc_hashslot(key):
-    s = key.find(b'{')
+    s = key.find(b"{")
     if s != -1:
-        e = key.find(b'}')
+        e = key.find(b"}")
         if e > s + 1:
-            key = key[s + 1:e]
+            key = key[s + 1 : e]
     return crc_hqx(key, 0) % 16384
 
 
@@ -23,25 +22,26 @@ def calc_hashslot(key):
 # TODO (correctness) add ASKING
 # TODO (correctness) make sure I dont have an issue where if there is a connection pool limit, I can get into a deadlock here
 # TODO (misc) future optimization, if we can't take from last_connection beacuse of connection pool limit, choose another random one.
-# TODO (correctness), disable encoding on all of conn commands
+# TODO (correctness) disable encoding on all of conn commands
 
 
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:
-            address = kwargs.pop('address', None)
+            address = kwargs.pop("address", None)
             if address:
-                addresses = (address, )
+                addresses = (address,)
             else:
-                addresses = (('localhost', 6379), )
+                addresses = (("localhost", 6379),)
         self._initial_addresses = addresses
         self._settings = kwargs
         self._connections = {}
-        self._lock = Lock()
+        self._lock = get_environment(**kwargs).lock()
         self._last_connection = None
         self._slots = []
         self._clustered = None
         self._command_cache = {}
+        self._last_connection_peername = None
 
     def __del__(self):
         self.close()
@@ -60,7 +60,7 @@ class SyncClusterConnectionPool:
         conn = self.take()
         try:
             try:
-                slots = conn(b'CLUSTER', b'SLOTS', attributes=False, decode=None)
+                slots = conn(b"CLUSTER", b"SLOTS", attributes=False, decode=None)
                 self._clustered = True
             except Error:
                 slots = []
@@ -79,8 +79,8 @@ class SyncClusterConnectionPool:
             new_connections = set([x[1] for x in slots])
             connections_to_remove = previous_connections - new_connections
             for address in connections_to_remove:
-               self._connections[address].close()
-               del self._connections[address]
+                self._connections[address].close()
+                del self._connections[address]
             self._slots = slots
 
             # TODO (misc) we can optimize this to only invalidate self._last_connection if it's not in new_connections
@@ -95,7 +95,7 @@ class SyncClusterConnectionPool:
         if self._clustered == False:
             return self.take()
         if not self._slots:
-            raise Exception('Could not find any slots in the redis cluster')
+            raise Exception("Could not find any slots in the redis cluster")
         for slot in self._slots:
             # TODO flip logic ?
             if hashslot > slot[0]:
@@ -104,19 +104,19 @@ class SyncClusterConnectionPool:
         address = slot[1]
         return self.take(address)
 
+    # TODO (correctness) return value is wrong
     def _get_index_for_command(self, *cmd):
         # commands are ascii, yes ? some commands can be larger than cmd[0] for index ? meh, let's be optimistic for now
         # TODO (misc) refactor this to utils
         if isinstance(cmd[0], dict):
-            cmd = cmd[0]['command']
-        command = bytes(cmd[0], 'ascii').upper()
+            cmd = cmd[0]["command"]
+        command = bytes(cmd[0], "ascii").upper()
         index = self._command_cache.get(command, -1)
         if index != -1:
             return index
         conn = self.take()
         try:
-            # TODO (coorectness) see how this is in RESP2/RESP3 (also encoding !!!!!!!!!!!)
-            command_info = conn(b'COMMAND', b'INFO', command)
+            command_info = conn(b"COMMAND", b"INFO", command, attribues=None, decode=None)
         finally:
             self.release(conn)
         command_info = command_info[0]
@@ -124,18 +124,6 @@ class SyncClusterConnectionPool:
             index = command_info[3]
         else:
             index = 0
-        """if index == 0:
-            conn = self.take()
-            try:
-                # TODO (coorectness) see how this is in RESP2/RESP3 (also encoding !!!!!!!!!!!)
-                command = [b'COMMAND', b'GETKEYS']
-                command.extend(cmd)
-                command_info = conn(*command)
-                import pdb; pdb.set_trace()
-            except Exception:
-                pass
-            finally:
-                self.release(conn)"""
         self._command_cache[command] = index
         # TODO map unknown to None
         return index
@@ -172,51 +160,50 @@ class SyncClusterConnectionPool:
             break
         # TODO make this atomicaly
         conn = self._last_connection.take()
+        self._last_connection_peername = conn.peername()
         return conn
 
     def take_by_key(self, key):
         if not isinstance(key, (bytes, bytearray)):
-            key = parse_encoding(self._settings.get('encoder', None))(key)
+            key = parse_encoding(self._settings.get("encoder", None))(key)
         hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
 
     def take_by_cmd(self, *cmd):
-        index = None
+        index = 0
         if is_multiple_commands(*cmd):
             for command in cmd:
                 index = self._get_index_for_command(*command)
-                if index is not None:
-                #TODO fix wrong
+                if index != 0:
+                    cmd = command
                     break
         else:
             index = self._get_index_for_command(*cmd)
+        # This should happen only if command doesn't exist
         if index is None:
             return self.take()
-        # TODO WRONG AND LAME
         if isinstance(cmd[0], dict):
-            cmd = cmd[0]['command']
-        # TODO maybe see if command is movablekeys, and only do this then, for optimizations
+            cmd = cmd[0]["command"]
+        # TODO (misc) maybe see if command is movablekeys, and only do this then, for optimizations
         if index == 0:
             conn = self.take()
             try:
-                # TODO (correctness) see how this is in RESP2/RESP3 (also encoding !!!!!!!!!!!)
-                command = [b'COMMAND', b'GETKEYS']
+                command = [b"COMMAND", b"GETKEYS"]
+                # TODO (correctness) we should apply the encoding parameters here as well (might come from **kwargs) ?
                 command.extend(cmd)
-                command_info = conn(*command)
+                # TODO (misc) what do we want to do if an exception happened here ?
+                command_info = conn(*command, attributes=False, decode=False)
                 key = command_info[0]
-            except Exception:
-                # TODO (what to do here?)
-                return self.take()
-                pass
             finally:
                 self.release(conn)
         else:
+            # The command did not specify the key, usually this will result in a usage error ?
             if len(cmd) - 1 < index:
                 return self.take()
             else:
+                # TODO (correctness) I don't like all this .encode() and stuff, we miss out on the encoding, handle this somwehere better maybe utils ?
                 key = cmd[index].encode()
-        hashslot = calc_hashslot(key)
-        return self._connection_by_hashslot(hashslot)
+        return self.take_by_key(key)
 
     def release(self, conn):
         if self._clustered:
@@ -224,6 +211,7 @@ class SyncClusterConnectionPool:
             address = conn.peername()
             pool = self._connections.get(address)
         else:
+            # TODO (correctness) risky, if last_connection somehow changed (multiple fallback address?), we might be returning to the wrong one, does it matter than ?!?
             pool = self._last_connection
         # The connection might have been discharged
         if pool is None:
@@ -231,74 +219,77 @@ class SyncClusterConnectionPool:
             return
         pool.release(conn)
 
-    def __call__(self, *cmd, endpoints=False, **kwargs):
-        if endpoints == 'masters':
-            # TODO send kwargs
-            return self._on_all_masters(*cmd)
-        elif endpoints != False:
-            raise ValueError('Only supported endpoints options is "masters" or False')
+    def __call__(self, *cmd, endpoint=False, **kwargs):
+        if endpoint == "masters":
+            return self._on_all_masters(*cmd, **kwargs)
+        if self._clustered == False:
+            conn = self.take()
         else:
-            if self._clustered == False:
-                conn = self.take()
-            else:
-                # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
-                conn = self.take_by_cmd(*cmd)
-            try:
-                return conn(*cmd, **kwargs)
-            # TODO (document) PartialError response here won't handle those MOVED ?
-            except Error as e:
-                if e.args[0].startswith(b'MOVED '):
-                    # TODO (misc) here is a case to reuse this connection instead of getting a new one inside _update_slots
-                    self._update_slots()
+            # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
+            conn = self.take_by_cmd(*cmd)
+        try:
+            return conn(*cmd, **kwargs)
+        finally:
+            seen_moved = conn.seen_moved()
+            self.release(conn)
+            if seen_moved:
+                self._update_slots()
+                # If the user specified he wants a specific endpoint, we won't force the issue on him.
+                # Also if ths cmd is multiple commands, we won't know which one failed and which didn't, so we don't try as well.
+                if endpoint == False and not is_multiple_commands(*cmd):
                     return self(*cmd, **kwargs)
-                raise
-            finally:
-                self.release(conn)
 
-    # TODO (documentation) because of MOVED semantics, it's best that on exception you should re-get a new cnonection each time (even on watch error)
+    # TODO (documentation) because of MOVED semantics, it's best that on exception you should re-get a new connection each time (even on watch error)
     @contextmanager
-    def connection(self, key=None, **kwargs):
-        if self._clustered == False or key is None:
+    def connection(self, key=None, endpoint=None, **kwargs):
+        if key and endpoint:
+            raise ValueError("Cannot specify both key and endpoint when taking a connection")
+        if endpoint:
+            conn = self.take(endpoint)
+        elif self._clustered == False or key is None:
             conn = self.take()
         else:
             # TODO (misc) defend against _database != 0
+            # TODO (correctness) encoding can be here in kwargs...
             conn = self.take_by_key(key)
         try:
-            # TODO handle MOVED error here
             yield conn
         finally:
             # We need to clean up the connection back to a normal state.
             try:
-                conn._command(b'DISCARD')
+                if not conn.closed():
+                    conn._command(b"DISCARD")
             except Error:
                 pass
-            self.release(conn)
+            finally:
+                # We need to handle the option where there was an moved error, to not have a recursion of a connection always trying the wrong server
+                seen_moved = conn.seen_moved()
+                self.release(conn)
+                if seen_moved:
+                    self._update_slots()
 
-    # TODO accept **kwargs !
-    def _on_all_masters(self, *cmd):
-        if self._clustered == False:
-            # TODO (correctness) fix the output to include the address
-            return {'local': self(*cmd)}
-        elif self._clustered is None:
+    def _on_all(self, *cmd, filter='master', **kwargs):
+        if self._clustered is None:
             self._update_slots()
+        if self._clustered == False:
+            # This will be always filled by the _update_slots (atleast)
+            return {self._last_connection_peername: self(*cmd, **kwargs)}
         res = {}
-        # TODO (correctness) if this loop fails, catch and return partial error... just like multiple concurrent commands
         for address in self.endpoints():
-            if 'master' not in address[1]:
+            if address[1]["type"] != filter:
                 continue
             address = address[0]
-            conn = self.take(address)
             try:
-                res[address] = conn(*cmd)
-            except:
-                self.release(conn)
+                res[address] = self(*cmd, endpoint=address, **kwargs)
+            except Exception as e:
+                res[address] = e
         return res
 
-    # TODO (misc) thread safety
     def endpoints(self):
         if self._clustered is None:
             self._update_slots()
         if self._clustered:
-            return [(x[1], ['master']) for x in self._slots]
+            return [(x[1], {"type": "master"}) for x in self._slots.copy()]
         else:
-            return [(x, ['regular']) for x in self._initial_addresses]
+            # This will be always filled by the _update_slots (atleast)
+            return [(self._last_connection_peername, {"type": "regular"})]

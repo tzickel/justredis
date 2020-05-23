@@ -4,29 +4,31 @@ from justredis import SyncRedis
 
 # TODO (misc) in the future allow direct redis instances ?
 
-def redis_with_client(dockerimage='redis', extraparams='', **kwargs):
+
+def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
     import redis_server
 
     instance = redis_server.RedisServer(dockerimage=dockerimage, extraparams=extraparams)
-    with SyncRedis(address=('localhost', instance.port), **kwargs) as r:
+    with SyncRedis(address=("localhost", instance.port), **kwargs) as r:
         try:
             yield r
         finally:
             instance.close()
 
 
-def redis_cluster_with_client(dockerimage='redis', extraparams=''):
+def redis_cluster_with_client(dockerimage="redis", extraparams=""):
     import redis_server
 
     servers, stdout = redis_server.start_cluster(3, dockerimage=dockerimage, extraparams=extraparams)
-    with SyncRedis(address=('localhost', servers[0].port)) as r:
+    with SyncRedis(address=("localhost", servers[0].port)) as r:
         import time
+
         wait = 50
         while wait:
-            result = r(b'CLUSTER', b'INFO', endpoints='masters')
+            result = r(b"CLUSTER", b"INFO", endpoints="masters")
             ready = True
             for res in result.values():
-                if b'cluster_state:ok' not in res:
+                if b"cluster_state:ok" not in res:
                     ready = False
                     break
             if ready:
@@ -34,14 +36,14 @@ def redis_cluster_with_client(dockerimage='redis', extraparams=''):
             time.sleep(1)
             wait -= 1
         if not wait:
-            raise Exception('Cluster is down, could not run test')
+            raise Exception("Cluster is down, could not run test")
         yield r
 
 
 # TODO (misc) No better way to do it pytest ?
 def generate_fixture_params(cluster=True):
     params = []
-    versions = ('5', '6')
+    versions = ("5", "6")
     for version in versions:
         if cluster:
             params.append(("redis:%s" % version, False))
@@ -63,5 +65,5 @@ def client(request):
 
 @pytest.fixture(scope="module", params=generate_fixture_params(False))
 def client_with_blah_password(request):
-    for item in redis_with_client(request.param, extraparams='--requirepass blah', password='blah'):
+    for item in redis_with_client(request.param, extraparams="--requirepass blah", password="blah"):
         yield item

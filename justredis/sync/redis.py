@@ -1,23 +1,11 @@
 from .connectionpool import SyncConnectionPool
 from .cluster import SyncClusterConnectionPool
 from ..decoder import Error
-from ..utils import parse_url
+from ..utils import parse_url, merge_dicts
 
 
 # TODO (misc) document all the kwargs everywhere
 # TODO (api) internal remove from connectionpool the __enter__/__exit__ and use take(**kwargs)/release
-
-
-def merge_dicts(parent, child):
-    if not parent and not child:
-        return None
-    elif not parent:
-        return child
-    elif not child:
-        return parent
-    tmp = parent.copy()
-    tmp.update(child)
-    return tmp
 
 
 # We do this seperation to allow changing per command and connection settings easily
@@ -47,7 +35,7 @@ class ModifiedRedis:
 
     def connection(self, *args, push=False, **kwargs):
         if args:
-            raise ValueError('Please specify the connection arguments as named arguments (i.e. push=..., key=...)')
+            raise ValueError("Please specify the connection arguments as named arguments (i.e. push=..., key=...)")
         wrapper = PushConnection if push else Connection
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
@@ -107,9 +95,9 @@ class SyncRedis(ModifiedRedis):
             tcp_keepalive
             tcp_nodelay
         """
-        if pool_factory == 'pool':
+        if pool_factory == "pool":
             pool_factory = SyncConnectionPool
-        elif pool_factory == 'auto':
+        elif pool_factory == "auto":
             pool_factory = SyncClusterConnectionPool
         # TODO (api) should we put the **settings here too ?
         super(SyncRedis, self).__init__(pool_factory(**kwargs))
@@ -179,7 +167,7 @@ class PushConnection(Connection):
 
     def next_message(self, *args, timeout=None, **kwargs):
         if args:
-            raise ValueError('Please specify the next_message arguments as named arguments (i.e. timeout=...)')
+            raise ValueError("Please specify the next_message arguments as named arguments (i.e. timeout=...)")
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
             return self._connection.pushed_message(timeout=timeout)

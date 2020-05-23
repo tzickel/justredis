@@ -12,5 +12,3 @@ class ConnectionPoolError(RedisError):
 
 class ProtocolError(RedisError):
     pass
-
-

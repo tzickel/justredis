@@ -8,7 +8,7 @@ from ..utils import get_command_name, is_multiple_commands, get_command
 from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper, SyncSslSocketWrapper
 
 
-not_allowed_commands = b'MONITOR', b'SUBSCRIBE', b'PSUBSCRIBE', b'UNSUBSCRIBE', b'PUNSUBSCRIBE'
+not_allowed_commands = b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE"
 
 
 class TimeoutError(Exception):
@@ -20,9 +20,9 @@ timeout_error = TimeoutError()
 
 class SyncConnection:
     def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, connect_retry=2, **kwargs):
-        if socket_factory == 'unix':
+        if socket_factory == "unix":
             socket_factory = SyncUnixDomainSocketWrapper
-        elif socket_factory == 'ssl':
+        elif socket_factory == "ssl":
             socket_factory = SyncSslSocketWrapper
         connect_retry += 1
         while connect_retry:
@@ -40,18 +40,20 @@ class SyncConnection:
 
         self._last_database = 0
 
+        self._seen_moved = False
+
         connected = False
         if resp_version not in (-1, 2, 3):
-            raise Exception('Unsupported RESP protocol version %s' % resp_version)
+            raise Exception("Unsupported RESP protocol version %s" % resp_version)
         if resp_version != 2:
-            args = [b'HELLO', b'3']
+            args = [b"HELLO", b"3"]
             if password:
                 if username:
-                    args.extend((b'AUTH', username, password))
+                    args.extend((b"AUTH", username, password))
                 else:
-                    args.extend((b'AUTH', b'default', password))
+                    args.extend((b"AUTH", b"default", password))
             if client_name:
-                args.extend((b'SETNAME', client_name))
+                args.extend((b"SETNAME", client_name))
             try:
                 # TODO (misc) do something with the result ?
                 self._command(*args)
@@ -59,20 +61,20 @@ class SyncConnection:
             except Error as e:
                 # TODO (misc) what to do about error encoding ?
                 # This is to seperate an login error from the server not supporting RESP3
-                if e.args[0].startswith(b'ERR'):
+                if e.args[0].startswith(b"ERR"):
                     if resp_version == 3:
-                        raise Exception('Server does not support RESP3 protocol')
+                        raise Exception("Server does not support RESP3 protocol")
                 else:
                     raise
         if not connected:
             self._decoder = RedisResp2Decoder(**kwargs)
             if password:
                 if username:
-                    self._command(b'AUTH', username, password)
+                    self._command(b"AUTH", username, password)
                 else:
-                    self._command(b'AUTH', password)
+                    self._command(b"AUTH", password)
             if client_name:
-                self._command(b'CLIENT', b'SETNAME', client_name)
+                self._command(b"CLIENT", b"SETNAME", client_name)
 
     def __del__(self):
         self.close()
@@ -121,10 +123,10 @@ class SyncConnection:
                 if res == need_more_data:
                     if self._seen_eof:
                         self.close()
-                        raise EOFError('Connection reached EOF')
+                        raise EOFError("Connection reached EOF")
                     else:
                         data = self._socket.recv(timeout)
-                        if data == b'':
+                        if data == b"":
                             self._seen_eof = True
                         else:
                             self._decoder.feed(data)
@@ -149,7 +151,7 @@ class SyncConnection:
 
     def set_database(self, database):
         if database != self._last_database:
-            self._command(b'SELECT', database)
+            self._command(b"SELECT", database)
             self._last_database = database
 
     # TODO (correctness) if we see SELECT we should update it manually !
@@ -173,10 +175,12 @@ class SyncConnection:
         if _attributes is not None:
             attributes = _attributes
         if get_command_name(cmd) in not_allowed_commands:
-            raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
+            raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
         self._send(*cmd, encoder=encoder)
         res = self._recv(decoder=decoder, attributes=attributes)
         if isinstance(res, Error):
+            if res.args[0].startswith(b'MOVED '):
+                self._seen_moved = True
             raise res
         if res == timeout_error:
             self.close()
@@ -189,7 +193,7 @@ class SyncConnection:
         for cmd in cmds:
             cmd, encoder, decoder, attributes = get_command(*cmd)
             if get_command_name(cmd) in not_allowed_commands:
-                raise Exception('Command %s is not allowed to be called directly, use the appropriate API instead' % cmd)
+                raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
             send.append((cmd, encoder))
             recv.append((decoder, attributes))
         # TODO (correctness) check if I need to pass here *send or send
@@ -200,6 +204,8 @@ class SyncConnection:
         for _recv in recv:
             result = self._recv(decoder=_recv[0], attributes=_recv[1])
             if isinstance(result, Error):
+                if result.args[0].startswith(b'MOVED '):
+                    self.seen_moved = True
                 found_errors = True
             if result == timeout_error:
                 self.close()
@@ -207,3 +213,9 @@ class SyncConnection:
         if found_errors:
             raise Exception(res)
         return res
+
+    def seen_moved(self):
+        if self._seen_moved:
+            self._seen_moved = False
+            return True
+        return False
