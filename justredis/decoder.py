@@ -237,6 +237,7 @@ class RedisRespDecoder:
                     if msg is not None:
                         break
                     yield _need_more_data
+                msg = bytes(msg)
             # Number
             elif buffer.skip_if_startswith(b':'):
                 msg_type = Number
@@ -378,8 +379,9 @@ class RedisRespDecoder:
                         if len(buffer) >= length + 2:
                             break
                         yield _need_more_data
-                    msg = self._decoder(buffer.take(length))
+                    msg = buffer.take(length)
                     buffer.skip(2)
+                    msg = bytes(msg)
             # Big number
             elif buffer.skip_if_startswith(b'('):
                 msg_type = BigNumber
@@ -547,6 +549,7 @@ class RedisResp2Decoder:
                     if msg is not None:
                         break
                     yield _need_more_data
+                msg = bytes(msg)
             # Number
             elif buffer.skip_if_startswith(b':'):
                 msg_type = Number

@@ -4,6 +4,10 @@ from ..decoder import Error
 from ..utils import parse_url
 
 
+# TODO (misc) document all the kwargs everywhere
+# TODO (api) internal remove from connectionpool the __enter__/__exit__ and use take(**kwargs)/release
+
+
 def merge_dicts(parent, child):
     if not parent and not child:
         return None
@@ -41,17 +45,17 @@ class ModifiedRedis:
         else:
             return self._connection_pool(*cmd, **settings)
 
-    def connection(self, *cmds, push=False, **kwargs):
-        if cmds:
-            raise Exception('Please specify the key')
+    def connection(self, *args, push=False, **kwargs):
+        if args:
+            raise ValueError('Please specify the connection arguments as named arguments (i.e. push=..., key=...)')
         wrapper = PushConnection if push else Connection
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
             conn = self._connection_pool.connection()
-            return wrapper(conn)
         else:
             conn = self._connection_pool.connection(**settings)
-            return wrapper(conn, **settings)
+        # TODO (api) should we put the **settings here too ?
+        return wrapper(conn)
 
     def endpoints(self):
         return self._connection_pool.endpoints()
@@ -62,8 +66,8 @@ class ModifiedRedis:
         return ModifiedRedis(self._connection_pool, **settings)
 
 
-# TODO (misc) should we implement an callback for when slots have changed ?
-# TODO (misc) allow some registration method for speacialized commands ?
+# TODO (api) should we implement an callback for when slots have changed ?
+# TODO (api) allow some registration method for speacialized commands ?
 class SyncRedis(ModifiedRedis):
     @classmethod
     def from_url(cls, url, **kwargs):
@@ -72,7 +76,6 @@ class SyncRedis(ModifiedRedis):
         return cls(**res)
 
     def __init__(self, pool_factory=SyncClusterConnectionPool, **kwargs):
-        # TODO docstring the kwargs
         """
             Possible arguments:
             database (0): The default redis database number (SELECT) for this instance
@@ -108,8 +111,8 @@ class SyncRedis(ModifiedRedis):
             pool_factory = SyncConnectionPool
         elif pool_factory == 'auto':
             pool_factory = SyncClusterConnectionPool
-        # TODO (misc) do I need to pass **kwargs here in the end ? (are there options which can do that?)
-        super(SyncRedis, self).__init__(pool_factory(**kwargs), **kwargs)
+        # TODO (api) should we put the **settings here too ?
+        super(SyncRedis, self).__init__(pool_factory(**kwargs))
 
     def __del__(self):
         self.close()
@@ -153,7 +156,7 @@ class ModifiedConnection:
 class Connection(ModifiedConnection):
     def __init__(self, connection, **kwargs):
         self._connection_context = connection
-        super(Connection, self).__init__(connection.__enter__(), **kwargs)
+        super(Connection, self).__init__(connection.__enter__())
 
     def __del__(self):
         self.close()
@@ -174,7 +177,9 @@ class PushConnection(Connection):
         else:
             return self._connection.push_command(*cmd, **settings)
 
-    def next_message(self, timeout=None, **kwargs):
+    def next_message(self, *args, timeout=None, **kwargs):
+        if args:
+            raise ValueError('Please specify the next_message arguments as named arguments (i.e. timeout=...)')
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
             return self._connection.pushed_message(timeout=timeout)

@@ -1,51 +1,64 @@
-What ?
----
+## What ?
 A redis client for Python
 
 Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
 
-Why ?
----
+## Why ?
 
-RESP2/RESP3 support
+- RESP2/RESP3 support
+- Transparent API (automatic figure out redis features)
+- Cluster support
+- Per context / command properties (database #, decoding, encoding, RESP3 attributes, etc...)
+- Pipelining
+- Modular API allowing for support for multiple synchronous and (later) asynchronous event loops
 
-The client can talk to Redis servers both as RESP2 and RESP3. You can explicitly specify which version you want, and specify if you are intrested in recving attributes or not (this effects which result types you get). The API Questions below documents what this means.
+## Roadmap
 
-Cluster support
+- Asynchronous I/O support with the same exact API (but with the await keyword)
+- Transparent EVAL script caching
+- Redis client-side caching
 
-The client will automatically detect if the server is part of a cluster or not, and figure out which keys are part of a command. You can manually force it to not use a cluster.
+## Not on roadmap (for now?)
 
-Per command optional settings (encoding, decoding, attribues)
+- Hiredis support
+- Sentinal support
+- High level features which are not part of the redis specification (such as locks, retry watchs, etc...)
+- Manual command interface (maybe for special stuff like bit operations?)
 
-If you configured the client to decode the results as unicode strings, but you want a specific result to be left as an bytes, you can specify that. The API Questions below shows how to do that.
+## Installing
+For now you can install this via this github repository by pip installing or adding to your requirements.txt file:
 
+```
+git+git://github.com/tzickel/justredis@master#egg=justredis
+```
 
-Roadmap
----
-Asynchronous I/O support with the same exact API (but with the await keyword)
-Transparent EVAL script caching
-Clear seperation between the I/O and concurrency code to the rest
+Replace master with the specific branch or version tag you want.
 
-Should allow for easy portablity to other event loops such as gevent, and async ones such as asyncio and trio.
+## Examples
 
-Not on roadmap (for now)
----
-hiredis support
-sentinal server support
-high level features which are not part of the redis specification (such as locks)
-manually specifing each command it's result and help (maybe for special stuff like bit operations?)
+TBD
 
-Installing
----
+## API
 
-Examples
----
+TBD
 
-API
----
+## Redis command replacements
+The following redis commands should not be called directly, but via the library API:
 
-Redis command replacments
----
+### Password (AUTH / ACL)
 
-API questions
----
+### Database selection (SELECT)
+
+### Transaction (WATCH / MULTI / EXEC / DISCARD)
+
+### Pubsub and monitor (SUBSCRIBE / PSUBSCRIBE / UNSUBSCRIBE / PUNSUBSCRIBE / MONITOR)
+
+## Additional commands
+
+### Cluster commands
+
+TBD
+
+## Open questions
+
+TBD

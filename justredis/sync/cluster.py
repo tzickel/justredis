@@ -172,7 +172,6 @@ class SyncClusterConnectionPool:
             break
         # TODO make this atomicaly
         conn = self._last_connection.take()
-        self._last_connection_peername = conn.peername()
         return conn
 
     def take_by_key(self, key):
@@ -220,9 +219,12 @@ class SyncClusterConnectionPool:
         return self._connection_by_hashslot(hashslot)
 
     def release(self, conn):
-        # TODO (correctness) is the peername always 100% the same as the slot address ? to be on the safe side we can store both @ metadata
-        address = conn.peername()
-        pool = self._connections.get(address)
+        if self._clustered:
+            # TODO (correctness) is the peername always 100% the same as the slot address ? to be on the safe side we can store both @ metadata
+            address = conn.peername()
+            pool = self._connections.get(address)
+        else:
+            pool = self._last_connection
         # The connection might have been discharged
         if pool is None:
             conn.close()

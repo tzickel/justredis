@@ -36,7 +36,6 @@ def parse_encoding(encoding):
         raise ValueError('Invalid encoding: %r' % encoding)
 
 
-# TODO (misc) add close for pypy
 class RedisRespEncoder:
     def __init__(self, encoder=None, cutoff_size=6000, **kwargs):
         self._encoder = parse_encoding(encoder)
@@ -78,6 +77,13 @@ class RedisRespEncoder:
             _add_data(b'\r\n')
     
     def extract(self):
+        self._uncompressed_length = 0
+        ret = b''.join(self._compressed_chunks) + b''.join(self._uncompressed_chunks)
+        if ret:
+            self._compressed_chunks.clear()
+            self._uncompressed_chunks.clear()
+            return ret
+        return None
         if self._compressed_chunks:
             return self._compressed_chunks.popleft()
         if self._uncompressed_chunks:
@@ -89,3 +95,51 @@ class RedisRespEncoder:
                 self._uncompressed_chunks.clear()
                 return ret
         return None
+
+
+class RedisRespEncoder:
+    def __init__(self, encoder=None, cutoff_size=6000, **kwargs):
+        self._encoder = parse_encoding(encoder)
+        self._cutoff_size = cutoff_size
+        self._chunks = deque()
+
+        self._compressed_chunks = deque()
+        self._uncompressed_chunks = deque()
+        self._uncompressed_length = 0
+
+    def encode(self, *cmd, encoder=None):
+        _add_data = self._chunks.append
+        encoder = self._encoder if encoder is None else parse_encoding(encoder)
+        _add_data(b'*%d\r\n' % len(cmd))
+        for arg in cmd:
+            arg = encoder(arg)
+            if isinstance(arg, memoryview):
+                length = arg.nbytes
+            else:
+                length = len(arg)
+            _add_data(b'$%d\r\n' % length)
+            _add_data(arg)
+            _add_data(b'\r\n')
+    
+    def extract(self):
+        length = 0
+        ret = []
+        while True:
+            if length > self._cutoff_size or not self._chunks:
+                if not ret:
+                    return None
+                elif len(ret) == 1:
+                    return ret[0]
+                else:
+                    return b''.join(ret)
+            item = self._chunks.popleft()
+            item_len = len(item)
+            if item_len > self._cutoff_size:
+                if length == 0:
+                    return item
+                else:
+                    self._chunks.appendleft(item)
+                    return b''.join(ret)
+            else:
+                ret.append(item)
+                length += item_len

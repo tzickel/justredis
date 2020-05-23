@@ -45,6 +45,7 @@ class SyncSocketWrapper:
         self._socket = sock
 
     def send(self, data):
+        #self._socket.sendmsg(data)
         self._socket.sendall(data)
 
     def recv(self, timeout=False):

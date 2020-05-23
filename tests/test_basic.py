@@ -6,7 +6,7 @@ from justredis import SyncRedis, Error
 
 
 def test_auth(client_with_blah_password):
-    address = ('localhost', client_with_blah_password._settings['address'][1])
+    address = client_with_blah_password.endpoints()[0][0]
     # No password
     with SyncRedis(address=address) as r:
         with pytest.raises(Error) as exc_info:

@@ -4,11 +4,11 @@ from justredis import SyncRedis
 
 # TODO (misc) in the future allow direct redis instances ?
 
-def redis_with_client(dockerimage='redis', extraparams=''):
+def redis_with_client(dockerimage='redis', extraparams='', **kwargs):
     import redis_server
 
     instance = redis_server.RedisServer(dockerimage=dockerimage, extraparams=extraparams)
-    with SyncRedis(address=('localhost', instance.port)) as r:
+    with SyncRedis(address=('localhost', instance.port), **kwargs) as r:
         try:
             yield r
         finally:
@@ -63,5 +63,5 @@ def client(request):
 
 @pytest.fixture(scope="module", params=generate_fixture_params(False))
 def client_with_blah_password(request):
-    for item in redis_with_client(request.param, extraparams='--requirepass blah'):
+    for item in redis_with_client(request.param, extraparams='--requirepass blah', password='blah'):
         yield item
