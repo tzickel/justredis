@@ -1,9 +1,9 @@
 from urllib.parse import urlparse
 
 
-# TODO complete all possibile options
-# TODO do I need to url encoding escape something ?
-# TODO how to parse multiple addresses?
+# TODO (correctness) complete all possibile options
+# TODO (correctness) do I need to url encoding escape something ?
+# TODO (misc) how to parse multiple addresses?
 def parse_url(url):
     result = urlparse(url)
     res = {}

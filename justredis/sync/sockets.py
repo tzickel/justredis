@@ -21,7 +21,7 @@ class SyncSocketWrapper:
     def close(self):
         self._socket.close()
 
-    def _create(self, address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=None, **kwargs):
+    def _create(self, address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=True, **kwargs):
         if address is None:
             address = ("localhost", 6379)
         sock = socket.create_connection(address, connect_timeout) # ASYNC

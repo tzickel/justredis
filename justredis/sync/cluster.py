@@ -1,5 +1,6 @@
 from binascii import crc_hqx
 from contextlib import contextmanager
+from random import choice
 
 from .environment import get_environment
 from .connectionpool import SyncConnectionPool
@@ -23,7 +24,7 @@ def calc_hashslot(key):
 # TODO (correctness) make sure I dont have an issue where if there is a connection pool limit, I can get into a deadlock here
 # TODO (misc) future optimization, if we can't take from last_connection beacuse of connection pool limit, choose another random one.
 # TODO (correctness) disable encoding on all of conn commands
-
+# TODO (correctness) when invalidating last_connection, run slots update ?
 
 class SyncClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
@@ -38,10 +39,12 @@ class SyncClusterConnectionPool:
         self._connections = {}
         self._lock = get_environment(**kwargs).lock()
         self._last_connection = None
-        self._slots = []
-        self._clustered = None
-        self._command_cache = {}
         self._last_connection_peername = None
+        self._slots = []
+        # None = unknown, False = Nop, True = Yep
+        self._clustered = None
+        # Command info results
+        self._command_cache = {}
 
     def __del__(self):
         self.close()
@@ -54,20 +57,24 @@ class SyncClusterConnectionPool:
             self._last_connection = None
 
     def _update_slots(self):
-        # TODO (misc) or if there is a hint from MOVED, recheck if clustered !
+        # TODO (misc) or if there is a hint from MOVED, recheck if clustered?
         if self._clustered is False:
             return
         conn = self.take()
         try:
-            try:
-                slots = conn(b"CLUSTER", b"SLOTS", attributes=False, decode=None)
-                self._clustered = True
-            except Error:
-                slots = []
-                self._clustered = False
+            slots = conn(b"CLUSTER", b"SLOTS", attributes=False, decode=None)
+            self._clustered = True
+        except Error:
+            slots = []
+            self._clustered = False
+        except Exception:
+            # This is done to invalidate a potentially bad server, and pick up another one randomally next try
+            self._last_connection = self._last_connection_peername = None
+            raise
         finally:
             self.release(conn)
-        # TODO (correctness) check response in RESP2/RESP3
+        # Our test coverage should make sure RESP2/3 answer the same here
+        # TODO (misc) what todo about holes in hashslots in response ?
         slots.sort(key=lambda x: x[0])
         slots = [(x[1], (x[2][0].decode(), x[2][1])) for x in slots]
         # We weren't in a cluster before, and we aren't now
@@ -83,11 +90,9 @@ class SyncClusterConnectionPool:
                 del self._connections[address]
             self._slots = slots
 
-            # TODO (misc) we can optimize this to only invalidate self._last_connection if it's not in new_connections
-
-            if self._last_connection_peername not in new_connections:
-                pass
-            # Since this is the only place we modify the slots list, let's make sure last_connection is still valid !
+            if connections_to_remove:
+                # TODO (misc) an optimization can only do this if it's not in new_connections
+                self._last_connection = self._last_connection_peername = None
 
     def _connection_by_hashslot(self, hashslot):
         if not self._slots:
@@ -97,36 +102,34 @@ class SyncClusterConnectionPool:
         if not self._slots:
             raise Exception("Could not find any slots in the redis cluster")
         for slot in self._slots:
-            # TODO flip logic ?
-            if hashslot > slot[0]:
-                continue
-            break
+            if hashslot <= slot[0]:
+                break
         address = slot[1]
         return self.take(address)
 
-    # TODO (correctness) return value is wrong
-    def _get_index_for_command(self, *cmd):
+    def _get_info_for_command(self, *cmd):
         # commands are ascii, yes ? some commands can be larger than cmd[0] for index ? meh, let's be optimistic for now
         # TODO (misc) refactor this to utils
         if isinstance(cmd[0], dict):
             cmd = cmd[0]["command"]
         command = bytes(cmd[0], "ascii").upper()
-        index = self._command_cache.get(command, -1)
-        if index != -1:
-            return index
+        info = self._command_cache.get(command)
+        if info:
+            return info
         conn = self.take()
         try:
             command_info = conn(b"COMMAND", b"INFO", command, attribues=None, decode=None)
+        except Exception:
+            # This is done to invalidate a potentially bad server, and pick up another one randomally next try
+            self._last_connection = self._last_connection_peername = None
+            raise
         finally:
             self.release(conn)
         command_info = command_info[0]
+        # TODO (misc) on null, cache it too ?
         if command_info:
-            index = command_info[3]
-        else:
-            index = 0
-        self._command_cache[command] = index
-        # TODO map unknown to None
-        return index
+            self._command_cache[command] = command_info
+        return command_info
 
     def _address_pool(self, address):
         pool = self._connections.get(address)
@@ -138,61 +141,67 @@ class SyncClusterConnectionPool:
                     self._connections[address] = pool
         return pool
 
-    # TODO we need to handle when last_connection points to a member of the pool that isn't valid anymore..
     # TODO (misc) make sure the address got here from _slots (or risk stale data)
-    # TODO fix this..
     def take(self, address=None):
         if address:
             return self._address_pool(address).take()
-        elif self._last_connection:
-            # TODO check health, if bad, update slots
-            try:
-                return self._last_connection.take()
-            except:
-                self._last_connection = None
-        ###endpoints = self.endpoints()
-        endpoints = [x[1] for x in self._slots]
-        if not endpoints:
-            endpoints = self._initial_addresses
-        for address in endpoints:
+        with self._lock:
+            if self._last_connection:
+                try:
+                    # TODO (misc) maybe do a health check here ? if there is an exception it will be invalidated anyhow for the next time...
+                    return self._last_connection.take()
+                except Exception:
+                    self._last_connection = None
+            endpoints = [x[1] for x in self._slots.copy()]
+            if not endpoints:
+                endpoints = self._initial_addresses
+            # TODO (correctness) should we pick up randomally, or go each one in the list on each failure ?
+            address = choice(endpoints)
             pool = self._address_pool(address)
             self._last_connection = pool
-            break
-        # TODO make this atomicaly
-        conn = self._last_connection.take()
-        self._last_connection_peername = conn.peername()
-        return conn
+            conn = self._last_connection.take()
+            self._last_connection_peername = conn.peername()
+            return conn
 
-    def take_by_key(self, key):
+    def take_by_key(self, key, **kwargs):
         if not isinstance(key, (bytes, bytearray)):
-            key = parse_encoding(self._settings.get("encoder", None))(key)
+            encode = kwargs.get('encoder', self._settings('encoder'))
+            key = parse_encoding(encode)(key)
         hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
 
-    def take_by_cmd(self, *cmd):
-        index = 0
+    def take_by_cmd(self, *cmd, **kwargs):
         if is_multiple_commands(*cmd):
+            found = False
+            # Some commands have no key information (like MULTI) so scan for one which does
             for command in cmd:
-                index = self._get_index_for_command(*command)
+                info = self._get_info_for_command(*command)
+                if info is None:
+                    continue
+                index = info[3]
                 if index != 0:
+                    found = True
                     cmd = command
                     break
+            if not found:
+                cmd = cmd[0]
         else:
-            index = self._get_index_for_command(*cmd)
+            info = self._get_info_for_command(*cmd)
         # This should happen only if command doesn't exist
-        if index is None:
+        if info is None:
             return self.take()
         if isinstance(cmd[0], dict):
             cmd = cmd[0]["command"]
         # TODO (misc) maybe see if command is movablekeys, and only do this then, for optimizations
+        index = info[3]
         if index == 0:
             conn = self.take()
             try:
                 command = [b"COMMAND", b"GETKEYS"]
-                # TODO (correctness) we should apply the encoding parameters here as well (might come from **kwargs) ?
                 command.extend(cmd)
                 # TODO (misc) what do we want to do if an exception happened here ?
-                command_info = conn(*command, attributes=False, decode=False)
+                encode = kwargs.get('encoder', self._settings('encoder'))
+                command_info = conn(*command, encoder=encode, attributes=False, decoder=False)
                 key = command_info[0]
             finally:
                 self.release(conn)
@@ -201,9 +210,8 @@ class SyncClusterConnectionPool:
             if len(cmd) - 1 < index:
                 return self.take()
             else:
-                # TODO (correctness) I don't like all this .encode() and stuff, we miss out on the encoding, handle this somwehere better maybe utils ?
-                key = cmd[index].encode()
-        return self.take_by_key(key)
+                key = cmd[index]
+        return self.take_by_key(key, **kwargs)
 
     def release(self, conn):
         if self._clustered:
@@ -226,7 +234,8 @@ class SyncClusterConnectionPool:
             conn = self.take()
         else:
             # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
-            conn = self.take_by_cmd(*cmd)
+            conn = self.take_by_cmd(*cmd, **kwargs)
+        # TODO (correctness) on I/O error, update slots as well...
         try:
             return conn(*cmd, **kwargs)
         finally:
@@ -251,7 +260,8 @@ class SyncClusterConnectionPool:
         else:
             # TODO (misc) defend against _database != 0
             # TODO (correctness) encoding can be here in kwargs...
-            conn = self.take_by_key(key)
+            conn = self.take_by_key(key, **kwargs)
+        # TODO (correctness) on I/O error, update slots as well...
         try:
             yield conn
         finally:
