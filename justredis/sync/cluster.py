@@ -134,7 +134,7 @@ class SyncClusterConnectionPool:
     def _address_pool(self, address):
         pool = self._connections.get(address)
         if pool is None:
-            with self._lock:
+            #with self._lock:
                 pool = self._connections.get(address)
                 if pool is None:
                     pool = SyncConnectionPool(address=address, **self._settings)
@@ -143,9 +143,12 @@ class SyncClusterConnectionPool:
 
     # TODO (misc) make sure the address got here from _slots (or risk stale data)
     def take(self, address=None):
-        if address:
-            return self._address_pool(address).take()
+        #if address:
+            #return self._address_pool(address).take()
+        # TODO (misc) is this best ?
         with self._lock:
+            if address:
+                return self._address_pool(address).take()
             if self._last_connection:
                 try:
                     # TODO (misc) maybe do a health check here ? if there is an exception it will be invalidated anyhow for the next time...
@@ -165,7 +168,7 @@ class SyncClusterConnectionPool:
 
     def take_by_key(self, key, **kwargs):
         if not isinstance(key, (bytes, bytearray)):
-            encode = kwargs.get('encoder', self._settings('encoder'))
+            encode = kwargs.get('encoder', self._settings.get('encoder'))
             key = parse_encoding(encode)(key)
         hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
@@ -200,7 +203,7 @@ class SyncClusterConnectionPool:
                 command = [b"COMMAND", b"GETKEYS"]
                 command.extend(cmd)
                 # TODO (misc) what do we want to do if an exception happened here ?
-                encode = kwargs.get('encoder', self._settings('encoder'))
+                encode = kwargs.get('encoder', self._settings.get('encoder'))
                 command_info = conn(*command, encoder=encode, attributes=False, decoder=False)
                 key = command_info[0]
             finally:

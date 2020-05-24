@@ -15,7 +15,17 @@ class ThreadedEnvironment:
     def lock():
         from threading import Lock
 
-        return Lock() # ASYNC
+        class OurLock:
+            def __init__(self):
+                self._lock = Lock()
+            
+            def __enter__(self):
+                self._lock.acquire() # ASYNC
+
+            def __exit__(self, *args):
+                self._lock.release() # ASYNC
+
+        return OurLock()
 
 
 def get_environment(environment=ThreadedEnvironment, **kargs):
