@@ -1,11 +1,5 @@
 class ThreadedEnvironment:
     @staticmethod
-    def socket():
-        from socket import socket
-
-        return socket
-
-    @staticmethod
     def semaphore():
         from threading import Semaphore
 
@@ -17,7 +11,7 @@ class ThreadedEnvironment:
                 self._semaphore.release()
 
             def acquire(self, blocking=True, timeout=None):
-                self._semaphore.acquire(blocking, timeout)
+                self._semaphore.acquire(blocking, timeout) # AWAIT
 
         return OurSemaphore()
 
