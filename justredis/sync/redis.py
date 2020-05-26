@@ -38,12 +38,13 @@ class ModifiedRedis:
             raise ValueError("Please specify the connection arguments as named arguments (i.e. push=..., key=...)")
         wrapper = PushConnection if push else Connection
         settings = merge_dicts(self._settings, kwargs)
+        # TODO (api) should we put the **settings here too ?
         if settings is None:
             conn = self._connection_pool.connection()
+            return wrapper(conn)
         else:
             conn = self._connection_pool.connection(**settings)
-        # TODO (api) should we put the **settings here too ?
-        return wrapper(conn, **settings)
+            return wrapper(conn, **settings)
 
     def endpoints(self):
         return self._connection_pool.endpoints()
@@ -158,6 +159,11 @@ class Connection(ModifiedConnection):
 
 
 class PushConnection(Connection):
+    def close(self):
+        # We close the connection here, since it's both hard to reset the state of the connection, and this is usually not done / at low frequency.
+        self._connection.close()
+        super(PushConnection, self).close()
+
     def __call__(self, *cmd, **kwargs):
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:

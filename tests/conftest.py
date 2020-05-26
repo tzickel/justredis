@@ -27,7 +27,7 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
     with Redis(address=("localhost", servers[0].port)) as r:
         import time
 
-        wait = 50
+        wait = 60
         while wait:
             result = r(b"CLUSTER", b"INFO", endpoint="masters")
             ready = True

@@ -135,11 +135,11 @@ def test_pubsub(client):
         pubsub("psubscribe", b"bye")
         assert pubsub.next_message() == [b"subscribe", b"hi", 1]
         assert pubsub.next_message() == [b"psubscribe", b"bye", 2]
-        assert pubsub.next_message(0.1) == None
+        assert pubsub.next_message(timeout=0.1) == None
         client("publish", "hi", "there")
-        assert pubsub.next_message(0.1) == [b"message", b"hi", b"there"]
+        assert pubsub.next_message(timeout=0.1) == [b"message", b"hi", b"there"]
         client("publish", "bye", "there")
-        assert pubsub.next_message(0.1) == [b"pmessage", b"bye", b"bye", b"there"]
+        assert pubsub.next_message(timeout=0.1) == [b"pmessage", b"bye", b"bye", b"there"]
         pubsub("ping")
         # RESP2 and RESP3 behave differently here, so check for both
         assert pubsub.next_message() in (b"PONG", [b"pong", b""])
@@ -155,32 +155,49 @@ def test_misc(client):
     client("client", "list")
 
 
-def test_server(client):
-    # TODO split keys to 3 comps
-    client("set", "cluster_aa", "a") == b"OK"
-    client("set", "cluster_bb", "b") == b"OK"
-    client("set", "cluster_cc", "c") == b"OK"
-    # TODO this is bad, return ips
-    result = client("keys", "cluster_*", endpoint="masters")
-    # TODO check both cluster and not cluster
-    if len(result) == 1:
-        result = list(result.values())
-        result = [i for s in result for i in s]
-    else:
-        assert len(result) == 3
-        result = list(result.values())
-        result = [i for s in result for i in s]
+def test_server_no_cluster(no_cluster_client):
+    r = no_cluster_client
+    r("set", "cluster_aa", "a") == b"OK"
+    r("set", "cluster_bb", "b") == b"OK"
+    r("set", "cluster_cc", "c") == b"OK"
+    result = r("keys", "cluster_*", endpoint="masters")
+    result = list(result.values())
+    result = [i for s in result for i in s]
     assert set(result) == set([b"cluster_aa", b"cluster_bb", b"cluster_cc"])
 
 
-def test_moved(client):
-    client("set", "aa", "a") == b"OK"
-    client("set", "bb", "b") == b"OK"
-    client("set", "cc", "c") == b"OK"
-    result = client("get", "aa", endpoint="masters")
-    if len(result) == 1:
-        result = list(result.values())
-        assert result == [b"a"]
-    else:
-        result = list(result.values())
-        assert result == [b"a", b"a", b"a"]
+def test_server_cluster(cluster_client):
+    r = cluster_client
+    # TODO split keys to 3 comps
+    r("set", "cluster_aa", "a") == b"OK"
+    r("set", "cluster_bb", "b") == b"OK"
+    r("set", "cluster_cc", "c") == b"OK"
+    result = r("keys", "cluster_*", endpoint="masters")
+    assert len(result) == 3
+    result = list(result.values())
+    result = [i for s in result for i in s]
+    assert set(result) == set([b"cluster_aa", b"cluster_bb", b"cluster_cc"])
+
+
+def test_moved_no_cluster(no_cluster_client):
+    r = no_cluster_client
+    r("set", "aa", "a") == b"OK"
+    r("set", "bb", "b") == b"OK"
+    r("set", "cc", "c") == b"OK"
+    result = r("get", "aa", endpoint="masters")
+    result = list(result.values())
+    assert result == [b"a"]
+
+
+def test_moved_cluster(cluster_client):
+    r = cluster_client
+    r("set", "aa", "a") == b"OK"
+    r("set", "bb", "b") == b"OK"
+    r("set", "cc", "c") == b"OK"
+    assert r("get", "aa") == b"a"
+    assert r("get", "bb") == b"b"
+    assert r("get", "cc") == b"c"
+    result = r("get", "aa", endpoint="masters")
+    result = list(result.values())
+    assert b"a" in result
+    assert len([x for x in result if isinstance(x, Error) and x.args[0].startswith(b"MOVED ")]) == 2

@@ -241,6 +241,8 @@ class SyncClusterConnectionPool:
             return self._on_all(*cmd, **kwargs)
         if self._clustered == False:
             conn = self.take()
+        elif endpoint:
+            conn = self.take(endpoint)
         else:
             # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
             conn = self.take_by_cmd(*cmd, **kwargs)
