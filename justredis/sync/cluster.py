@@ -65,7 +65,7 @@ class ClusterConnectionPool:
             return
         conn = self.take()
         try:
-            slots = conn(b"CLUSTER", b"SLOTS", attributes=False, decode=None)
+            slots = conn(b"CLUSTER", b"SLOTS", attributes=False, decoder=None)
             self._clustered = True
         except Error:
             slots = []
@@ -125,7 +125,7 @@ class ClusterConnectionPool:
             return info
         conn = self.take()
         try:
-            command_info = conn(b"COMMAND", b"INFO", command, attribues=None, decode=None)
+            command_info = conn(b"COMMAND", b"INFO", command, attributes=None, decoder=None)
         except Exception:
             # This is done to invalidate a potentially bad server, and pick up another one randomally next try
             self._last_connection = self._last_connection_peername = None

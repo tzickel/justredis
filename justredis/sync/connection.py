@@ -4,7 +4,7 @@ import socket
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
-from ..utils import get_command_name, is_multiple_commands, get_command
+from ..utils import get_command_name, is_multiple_commands
 from .sockets import SocketWrapper, UnixDomainSocketWrapper, SslSocketWrapper
 
 
@@ -62,7 +62,8 @@ class Connection:
                 self._command(*args)
                 connected = True
             except Error as e:
-                # TODO (misc) what to do about error encoding ?
+                # TODO (misc
+                # ) what to do about error encoding ?
                 # This is to seperate an login error from the server not supporting RESP3
                 if e.args[0].startswith(b"ERR"):
                     if resp_version == 3:
@@ -100,11 +101,11 @@ class Connection:
     def peername(self):
         return self._peername
 
-    def _send(self, *cmd, multiple=False, encoder=None):
+    def _send(self, *cmd, multiple=False, encoder=None, **kwargs):
         try:
             if multiple:
                 for _cmd in cmd:
-                    self._encoder.encode(*_cmd[0], encoder=_cmd[1])
+                    self._encoder.encode(*_cmd[0], **_cmd[1])
             else:
                 self._encoder.encode(*cmd, encoder=encoder)
             while True:
@@ -121,7 +122,7 @@ class Connection:
             raise
 
     # TODO (misc) should a decoding error be considered an CommunicationError ?
-    def _recv(self, timeout=False, decoder=False, attributes=None):
+    def _recv(self, timeout=False, decoder=False, attributes=None, **kwargs):
         try:
             while True:
                 res = self._decoder.extract(decoder=decoder, with_attributes=attributes)
@@ -143,7 +144,7 @@ class Connection:
             self.close()
             raise CommunicationError() from e
 
-    def pushed_message(self, timeout=False, decoder=None, **kwargs):
+    def pushed_message(self, timeout=False, decoder=False, **kwargs):
         res = self._recv(timeout, decoder)
         if res == timeout_error:
             return None
@@ -165,7 +166,6 @@ class Connection:
                 self._last_database = database
 
     # TODO (correctness) if we see SELECT we should update it manually !
-    # TODO handle **kwargs database, what else ?
     def __call__(self, *cmd, database=None, **kwargs):
         if not cmd:
             raise Exception()
@@ -175,18 +175,19 @@ class Connection:
         else:
             return self._command(*cmd, **kwargs)
 
-    def _command(self, *cmd, encoder=None, decoder=False, attributes=None, **kwargs):
-        cmd, _encoder, _decoder, _attributes = get_command(*cmd)
-        if _encoder is not None:
-            encoder = _encoder
-        if _decoder is not None:
-            decoder = _decoder
-        if _attributes is not None:
-            attributes = _attributes
-        if get_command_name(cmd) in not_allowed_commands:
+    def _command(self, *cmd, **kwargs):
+        if isinstance(cmd[0], dict):
+            cmd = cmd[0]
+            command = cmd.pop("command")
+            # We need to copy this to not modify the outer dictionary (but it's ok, usually people don't pass dictionary as commands)
+            kwargs = kwargs.copy()
+            kwargs.update(cmd)
+        else:
+            command = cmd
+        if get_command_name(command) in not_allowed_commands:
             raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
-        self._send(*cmd, encoder=encoder)
-        res = self._recv(decoder=decoder, attributes=attributes)
+        self._send(*command, **kwargs)
+        res = self._recv(**kwargs)
         if isinstance(res, Error):
             if res.args[0].startswith(b"MOVED "):
                 self._seen_moved = True
@@ -196,21 +197,27 @@ class Connection:
             raise TimeoutError()
         return res
 
-    def _commands(self, *cmds, encoder=None, decoder=False, attributes=None, **kwargs):
+    def _commands(self, *cmds, **kwargs):
         send = []
         recv = []
         for cmd in cmds:
-            cmd, encoder, decoder, attributes = get_command(*cmd)
-            if get_command_name(cmd) in not_allowed_commands:
+            if isinstance(cmd, dict):
+                command = cmd.pop("command")
+                tmp_kwargs = kwargs.copy()
+                tmp_kwargs.update(cmd)
+            else:
+                command = cmd
+                tmp_kwargs = kwargs
+            if get_command_name(command) in not_allowed_commands:
                 raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
-            send.append((cmd, encoder))
-            recv.append((decoder, attributes))
+            send.append((command, tmp_kwargs))
+            recv.append(tmp_kwargs)
         self._send(*send, multiple=True)
         res = []
         found_errors = False
         # TODO (misc) on error, return a partial error ?
         for _recv in recv:
-            result = self._recv(decoder=_recv[0], attributes=_recv[1])
+            result = self._recv(**_recv)
             if isinstance(result, Error):
                 if result.args[0].startswith(b"MOVED "):
                     self.seen_moved = True

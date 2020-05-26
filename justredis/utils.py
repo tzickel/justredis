@@ -45,15 +45,7 @@ def get_command_name(cmd):
 
 
 def is_multiple_commands(*cmd):
-    if isinstance(cmd[0], (tuple, list)):
+    if isinstance(cmd[0], (tuple, list, dict)):
         return True
     else:
         return False
-
-
-def get_command(*cmd):
-    if isinstance(cmd[0], dict):
-        cmd = cmd[0]
-        return cmd["command"], cmd.get("encoder", None), cmd.get("decoder", None), cmd.get("attributes", None)
-    else:
-        return cmd, None, None, None

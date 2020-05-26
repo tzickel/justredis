@@ -134,7 +134,7 @@ class RedisRespDecoder:
     # If you plan on handling both PUSH messages and normal messages on the same connection, specifing a custom decoder here till be problematic
     # Our codebase currently splits PUSH messages to a different connection so this is not an issue.
     # TODO (misc) maybe add decoder, and push_decoder ?
-    def extract(self, decoder=False, with_attributes=None):
+    def extract(self, decoder=False, with_attributes=None, **kwargs):
         # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
         original_decoder = None
         original_with_attributes = None
@@ -485,7 +485,7 @@ class RedisResp2Decoder:
     def feed(self, data):
         self._buffer.append(data)
 
-    def extract(self, decoder=False, with_attributes=None):
+    def extract(self, decoder=False, with_attributes=None, **kwargs):
         # We don't do an try/finally here, since if an error occured, the connection should be closed anyhow...
         original_decoder = None
         original_with_attributes = None

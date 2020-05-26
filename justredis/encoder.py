@@ -63,7 +63,7 @@ class RedisRespEncoder:
             self._uncompressed_chunks.append(data)
             self._uncompressed_length += data_length
 
-    def encode(self, *cmd, encoder=None):
+    def encode(self, *cmd, encoder=None, **kwargs):
         _add_data = self._add_data
         encoder = self._encoder if encoder is None else parse_encoding(encoder)
         _add_data(b"*%d\r\n" % len(cmd))
@@ -108,7 +108,7 @@ class RedisRespEncoder:
         self._uncompressed_chunks = deque()
         self._uncompressed_length = 0
 
-    def encode(self, *cmd, encoder=None):
+    def encode(self, *cmd, encoder=None, **kwargs):
         _add_data = self._chunks.append
         encoder = self._encoder if encoder is None else parse_encoding(encoder)
         _add_data(b"*%d\r\n" % len(cmd))
