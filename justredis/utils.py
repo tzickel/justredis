@@ -45,7 +45,9 @@ def get_command_name(cmd):
 
 
 def is_multiple_commands(*cmd):
-    if isinstance(cmd[0], (tuple, list, dict)):
+    if isinstance(cmd[0], dict) and len(cmd) > 1:
+        return True
+    elif isinstance(cmd[0], (tuple, list)):
         return True
     else:
         return False
