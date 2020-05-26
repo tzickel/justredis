@@ -35,6 +35,8 @@ class ClusterConnectionPool:
                 addresses = (address,)
             else:
                 addresses = (("localhost", 6379),)
+        elif address is not None:
+            raise ValueError("Do not provide both addresses, and address")
         self._initial_addresses = addresses
         self._settings = kwargs
         self._connections = {}
@@ -161,12 +163,14 @@ class ClusterConnectionPool:
                 except Exception:
                     self._last_connection = None
             endpoints = [x[1] for x in self._slots.copy()]
+            # TODO (correctness) maybe after I/O failure (repeated?) always go back to initial address ? or just remove an entry from the connection when it's invalid, till it's empty ?
             if not endpoints:
                 endpoints = self._initial_addresses
             # TODO (correctness) should we pick up randomally, or go each one in the list on each failure ?
             address = choice(endpoints)
             pool = self._address_pool(address)
             self._last_connection = pool
+            # TODO (corectness) on error, try the next one immidiatly
             conn = self._last_connection.take()
             self._last_connection_peername = conn.peername()
             return conn

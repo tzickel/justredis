@@ -98,7 +98,7 @@ class Redis(ModifiedRedis):
         """
         if pool_factory == "pool":
             pool_factory = ConnectionPool
-        elif pool_factory == "auto":
+        elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
         # TODO (api) should we put the **settings here too ?
         super(Redis, self).__init__(pool_factory(**kwargs))

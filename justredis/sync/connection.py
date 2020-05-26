@@ -19,8 +19,11 @@ timeout_error = TimeoutError()
 
 
 class Connection:
-    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper, connect_retry=2, **kwargs):
-        if socket_factory == "unix":
+    # TODO (correctness) client_name with connection pool (?)
+    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper, connect_retry=2, database=0, **kwargs):
+        if socket_factory == "tcp":
+            socket_factory = SocketWrapper
+        elif socket_factory == "unix":
             socket_factory = UnixDomainSocketWrapper
         elif socket_factory == "ssl":
             socket_factory = SslSocketWrapper
@@ -38,7 +41,7 @@ class Connection:
         self._seen_eof = False
         self._peername = self._socket.peername()
 
-        self._last_database = 0
+        self._default_database = self._last_database = database
 
         self._seen_moved = False
 
@@ -75,6 +78,8 @@ class Connection:
                     self._command(b"AUTH", password)
             if client_name:
                 self._command(b"CLIENT", b"SETNAME", client_name)
+        if database != 0:
+            self.command((b"SELECT", database))
 
     def __del__(self):
         self.close()
@@ -116,7 +121,7 @@ class Connection:
             raise
 
     # TODO (misc) should a decoding error be considered an CommunicationError ?
-    def _recv(self, timeout=False, decoder=None, attributes=None):
+    def _recv(self, timeout=False, decoder=False, attributes=None):
         try:
             while True:
                 res = self._decoder.extract(decoder=decoder, with_attributes=attributes)
@@ -150,23 +155,27 @@ class Connection:
         self._send(*cmd)
 
     def set_database(self, database):
-        if database != self._last_database:
-            self._command(b"SELECT", database)
-            self._last_database = database
+        if database is None:
+            if self._default_database != self._last_database:
+                self._command(b"SELECT", self._default_database)
+                self._last_database = self._default_database
+        else:
+            if database != self._last_database:
+                self._command(b"SELECT", database)
+                self._last_database = database
 
     # TODO (correctness) if we see SELECT we should update it manually !
     # TODO handle **kwargs database, what else ?
     def __call__(self, *cmd, database=None, **kwargs):
         if not cmd:
             raise Exception()
-        if database is not None:
-            self.set_database(database)
+        self.set_database(database)
         if is_multiple_commands(*cmd):
             return self._commands(*cmd, **kwargs)
         else:
             return self._command(*cmd, **kwargs)
 
-    def _command(self, *cmd, encoder=None, decoder=None, attributes=None, **kwargs):
+    def _command(self, *cmd, encoder=None, decoder=False, attributes=None, **kwargs):
         cmd, _encoder, _decoder, _attributes = get_command(*cmd)
         if _encoder is not None:
             encoder = _encoder
@@ -196,8 +205,7 @@ class Connection:
                 raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
             send.append((cmd, encoder))
             recv.append((decoder, attributes))
-        # TODO (correctness) check if I need to pass here *send or send
-        self._send(send, multiple=True)
+        self._send(*send, multiple=True)
         res = []
         found_errors = False
         # TODO (misc) on error, return a partial error ?
