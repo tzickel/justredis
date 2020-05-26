@@ -112,7 +112,11 @@ class SyncClusterConnectionPool:
         # TODO (misc) refactor this to utils
         if isinstance(cmd[0], dict):
             cmd = cmd[0]["command"]
-        command = bytes(cmd[0], "ascii").upper()
+        command = cmd[0]
+        encode = getattr(command, 'encode', None)
+        if encode:
+            command = encode('ascii')
+        command = command.upper()
         info = self._command_cache.get(command)
         if info:
             return info
@@ -204,8 +208,10 @@ class SyncClusterConnectionPool:
                 command.extend(cmd)
                 # TODO (misc) what do we want to do if an exception happened here ?
                 encode = kwargs.get('encoder', self._settings.get('encoder'))
-                command_info = conn(*command, encoder=encode, attributes=False, decoder=False)
+                command_info = conn(*command, encoder=encode, attributes=False, decoder=None)
                 key = command_info[0]
+            except Error:
+                return self.take()
             finally:
                 self.release(conn)
         else:
@@ -232,7 +238,7 @@ class SyncClusterConnectionPool:
 
     def __call__(self, *cmd, endpoint=False, **kwargs):
         if endpoint == "masters":
-            return self._on_all_masters(*cmd, **kwargs)
+            return self._on_all(*cmd, **kwargs)
         if self._clustered == False:
             conn = self.take()
         else:

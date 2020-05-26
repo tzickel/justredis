@@ -43,7 +43,7 @@ class ModifiedRedis:
         else:
             conn = self._connection_pool.connection(**settings)
         # TODO (api) should we put the **settings here too ?
-        return wrapper(conn)
+        return wrapper(conn, **settings)
 
     def endpoints(self):
         return self._connection_pool.endpoints()
@@ -56,7 +56,7 @@ class ModifiedRedis:
 
 # TODO (api) should we implement an callback for when slots have changed ?
 # TODO (api) allow some registration method for speacialized commands ?
-class SyncRedis(ModifiedRedis):
+class Redis(ModifiedRedis):
     @classmethod
     def from_url(cls, url, **kwargs):
         res = parse_url(url)
@@ -100,7 +100,7 @@ class SyncRedis(ModifiedRedis):
         elif pool_factory == "auto":
             pool_factory = SyncClusterConnectionPool
         # TODO (api) should we put the **settings here too ?
-        super(SyncRedis, self).__init__(pool_factory(**kwargs))
+        super(Redis, self).__init__(pool_factory(**kwargs))
 
     def __del__(self):
         self.close()
@@ -144,7 +144,7 @@ class ModifiedConnection:
 class Connection(ModifiedConnection):
     def __init__(self, connection, **kwargs):
         self._connection_context = connection
-        super(Connection, self).__init__(connection.__enter__())
+        super(Connection, self).__init__(connection.__enter__(), **kwargs)
 
     def __del__(self):
         self.close()

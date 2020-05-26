@@ -1,5 +1,5 @@
 import pytest
-from justredis import SyncRedis, Error
+from justredis import Redis, Error
 
 
 # TODO (misc) copy all of misc/example.py into here
@@ -8,37 +8,51 @@ from justredis import SyncRedis, Error
 def test_auth(client_with_blah_password):
     address = client_with_blah_password.endpoints()[0][0]
     # No password
-    with SyncRedis(address=address) as r:
+    with Redis(address=address) as r:
         with pytest.raises(Error) as exc_info:
-            r("set", "a", "b")
+            r("set", "auth_a", "b")
         assert exc_info.value.args[0].startswith(b"NOAUTH")
 
     # Wrong password
-    with SyncRedis(address=address, password="nop") as r:
+    with Redis(address=address, password="nop") as r:
         with pytest.raises(Error) as exc_info:
-            r("set", "a", "b")
+            r("set", "auth_a", "b")
         # Changes between Redis 5 and Redis 6
         assert exc_info.value.args[0].startswith(b"WRONGPASS") or exc_info.value.args[0].startswith(b"ERR invalid password")
 
     # Correct password
-    with SyncRedis(address=address, password="blah") as r:
-        assert r("set", "a", "b") == b"OK"
+    with Redis(address=address, password="blah") as r:
+        assert r("set", "auth_a", "b") == b"OK"
 
 
 def test_simple(client):
-    assert client("set", "a", "a") == b"OK"
-    assert client("set", "b", "b") == b"OK"
-    assert client("set", "c", "c") == b"OK"
-    assert client("set", "{a}b", "d") == b"OK"
-    assert client("get", "a") == b"a"
-    try:
-        with client.modify(database=1).connection(key="a") as c:
-            c("set", "a", "a") == b"OK"
-    except Error as e:
-        if e.args[0] == b"ERR SELECT is not allowed in cluster mode":
-            pass
-        else:
-            raise
+    r = client
+    assert r("set", "simple_a", "a") == b"OK"
+    assert r("set", "simple_b", "b") == b"OK"
+    assert r("set", "simple_c", "c") == b"OK"
+    assert r("set", "simple_{a}b", "d") == b"OK"
+    assert r("get", "simple_a") == b"a"
+    assert r("get", "simple_b") == b"b"
+    assert r("get", "simple_c") == b"c"
+    assert r("get", "simple_{a}b") == b"d"
+
+
+def test_modify_database(no_cluster_client):
+    r = no_cluster_client
+    r('set', 'modify_database_a_0', 'a')
+    with r.modify(database=1).connection(key="a") as c:
+        assert c('get', 'modify_database_a_0') == None
+        assert c("set", "modify_database_a_1", "a") == b"OK"
+
+
+def test_modify_database_cluster(cluster_client):
+    r = cluster_client
+    r('set', 'modify_database_cluster_a_0', 'a')
+    with pytest.raises(Error) as exc_info:
+        with r.modify(database=1).connection(key="a") as c:
+            assert c('get', 'modify_database_a_0') == None
+            assert c("set", "modify_database_a_1", "a") == b"OK"
+    assert exc_info.value.args[0] == (b"ERR SELECT is not allowed in cluster mode")
 
 
 def test_notallowed(client):
@@ -147,7 +161,7 @@ def test_server(client):
     client("set", "cluster_bb", "b") == b"OK"
     client("set", "cluster_cc", "c") == b"OK"
     # TODO this is bad, return ips
-    result = client("keys", "cluster_*", endpoints="masters")
+    result = client("keys", "cluster_*", endpoint="masters")
     # TODO check both cluster and not cluster
     if len(result) == 1:
         result = list(result.values())
@@ -163,7 +177,7 @@ def test_moved(client):
     client("set", "aa", "a") == b"OK"
     client("set", "bb", "b") == b"OK"
     client("set", "cc", "c") == b"OK"
-    result = client("get", "aa", endpoints="masters")
+    result = client("get", "aa", endpoint="masters")
     if len(result) == 1:
         result = list(result.values())
         assert result == [b"a"]

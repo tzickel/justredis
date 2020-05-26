@@ -20,10 +20,10 @@ class ThreadedEnvironment:
                 self._lock = Lock()
             
             def __enter__(self):
-                self._lock.acquire() # ASYNC
+                self._lock.acquire() # AWAIT
 
             def __exit__(self, *args):
-                self._lock.release() # ASYNC
+                self._lock.release() # AWAIT
 
         return OurLock()
 

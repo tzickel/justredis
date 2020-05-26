@@ -24,7 +24,7 @@ class SyncSocketWrapper:
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=True, **kwargs):
         if address is None:
             address = ("localhost", 6379)
-        sock = socket.create_connection(address, connect_timeout) # ASYNC
+        sock = socket.create_connection(address, connect_timeout) # AWAIT
         sock.settimeout(socket_timeout)
 
         if tcp_nodelay is not None:
@@ -45,18 +45,18 @@ class SyncSocketWrapper:
         self._socket = sock
 
     def send(self, data):
-        self._socket.sendall(data) # ASYNC
+        self._socket.sendall(data) # AWAIT
 
     def recv(self, timeout=False):
         if timeout is not False:
             old_timeout = self._socket.gettimeout()
             self._socket.settimeout(timeout)
             try:
-                r = self._socket.recv_into(self._buffer) # ASYNC
+                r = self._socket.recv_into(self._buffer) # AWAIT
             finally:
                 self._socket.settimeout(old_timeout)
         else:
-            r = self._socket.recv_into(self._buffer) # ASYNC
+            r = self._socket.recv_into(self._buffer) # AWAIT
         return self._view[:r]
 
     def peername(self):
@@ -72,7 +72,7 @@ class SyncUnixDomainSocketWrapper(SyncSocketWrapper):
             address = "/tmp/redis.sock"
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.settimeout(connect_timeout)
-        self._socket.connect(address) # ASYNC
+        self._socket.connect(address) # AWAIT
         self._socket.settimeout(socket_timeout)
 
 
