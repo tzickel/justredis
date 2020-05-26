@@ -39,18 +39,18 @@ def test_simple(client):
 
 def test_modify_database(no_cluster_client):
     r = no_cluster_client
-    r('set', 'modify_database_a_0', 'a')
+    r("set", "modify_database_a_0", "a")
     with r.modify(database=1).connection(key="a") as c:
-        assert c('get', 'modify_database_a_0') == None
+        assert c("get", "modify_database_a_0") == None
         assert c("set", "modify_database_a_1", "a") == b"OK"
 
 
 def test_modify_database_cluster(cluster_client):
     r = cluster_client
-    r('set', 'modify_database_cluster_a_0', 'a')
+    r("set", "modify_database_cluster_a_0", "a")
     with pytest.raises(Error) as exc_info:
         with r.modify(database=1).connection(key="a") as c:
-            assert c('get', 'modify_database_a_0') == None
+            assert c("get", "modify_database_a_0") == None
             assert c("set", "modify_database_a_1", "a") == b"OK"
     assert exc_info.value.args[0] == (b"ERR SELECT is not allowed in cluster mode")
 

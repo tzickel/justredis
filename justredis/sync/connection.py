@@ -5,7 +5,7 @@ from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
 from ..utils import get_command_name, is_multiple_commands, get_command
-from .sockets import SyncSocketWrapper, SyncUnixDomainSocketWrapper, SyncSslSocketWrapper
+from .sockets import SocketWrapper, UnixDomainSocketWrapper, SslSocketWrapper
 
 
 not_allowed_commands = b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE"
@@ -18,12 +18,12 @@ class TimeoutError(Exception):
 timeout_error = TimeoutError()
 
 
-class SyncConnection:
-    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SyncSocketWrapper, connect_retry=2, **kwargs):
+class Connection:
+    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper, connect_retry=2, **kwargs):
         if socket_factory == "unix":
-            socket_factory = SyncUnixDomainSocketWrapper
+            socket_factory = UnixDomainSocketWrapper
         elif socket_factory == "ssl":
-            socket_factory = SyncSslSocketWrapper
+            socket_factory = SslSocketWrapper
         connect_retry += 1
         while connect_retry:
             try:
@@ -179,7 +179,7 @@ class SyncConnection:
         self._send(*cmd, encoder=encoder)
         res = self._recv(decoder=decoder, attributes=attributes)
         if isinstance(res, Error):
-            if res.args[0].startswith(b'MOVED '):
+            if res.args[0].startswith(b"MOVED "):
                 self._seen_moved = True
             raise res
         if res == timeout_error:
@@ -204,7 +204,7 @@ class SyncConnection:
         for _recv in recv:
             result = self._recv(decoder=_recv[0], attributes=_recv[1])
             if isinstance(result, Error):
-                if result.args[0].startswith(b'MOVED '):
+                if result.args[0].startswith(b"MOVED "):
                     self.seen_moved = True
                 found_errors = True
             if result == timeout_error:

@@ -18,12 +18,12 @@ class ThreadedEnvironment:
         class OurLock:
             def __init__(self):
                 self._lock = Lock()
-            
+
             def __enter__(self):
-                self._lock.acquire() # AWAIT
+                self._lock.acquire()  # AWAIT
 
             def __exit__(self, *args):
-                self._lock.release() # AWAIT
+                self._lock.release()  # AWAIT
 
         return OurLock()
 

@@ -3,12 +3,12 @@ from contextlib import contextmanager
 from threading import Semaphore
 
 
-from .connection import SyncConnection
+from .connection import Connection
 from ..errors import ConnectionPoolError
 from ..decoder import Error
 
 
-class SyncConnectionPool:
+class ConnectionPool:
     def __init__(self, max_connections=None, wait_timeout=None, **connection_settings):
         self._max_connections = max_connections
         self._wait_timeout = wait_timeout
@@ -44,7 +44,7 @@ class SyncConnectionPool:
             if self._limit is not None and not self._limit.acquire(True, self._wait_timeout):
                 raise ConnectionPoolError("Could not acquire an connection form the pool")
             try:
-                conn = SyncConnection(**self._connection_settings)
+                conn = Connection(**self._connection_settings)
             except Exception:
                 if self._limit is not None:
                     self._limit.release()

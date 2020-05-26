@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from random import choice
 
 from .environment import get_environment
-from .connectionpool import SyncConnectionPool
+from .connectionpool import ConnectionPool
 from ..decoder import Error
 from ..utils import is_multiple_commands
 from ..encoder import parse_encoding
@@ -26,7 +26,8 @@ def calc_hashslot(key):
 # TODO (correctness) disable encoding on all of conn commands
 # TODO (correctness) when invalidating last_connection, run slots update ?
 
-class SyncClusterConnectionPool:
+
+class ClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:
             address = kwargs.pop("address", None)
@@ -113,9 +114,9 @@ class SyncClusterConnectionPool:
         if isinstance(cmd[0], dict):
             cmd = cmd[0]["command"]
         command = cmd[0]
-        encode = getattr(command, 'encode', None)
+        encode = getattr(command, "encode", None)
         if encode:
-            command = encode('ascii')
+            command = encode("ascii")
         command = command.upper()
         info = self._command_cache.get(command)
         if info:
@@ -138,17 +139,17 @@ class SyncClusterConnectionPool:
     def _address_pool(self, address):
         pool = self._connections.get(address)
         if pool is None:
-            #with self._lock:
-                pool = self._connections.get(address)
-                if pool is None:
-                    pool = SyncConnectionPool(address=address, **self._settings)
-                    self._connections[address] = pool
+            # with self._lock:
+            pool = self._connections.get(address)
+            if pool is None:
+                pool = ConnectionPool(address=address, **self._settings)
+                self._connections[address] = pool
         return pool
 
     # TODO (misc) make sure the address got here from _slots (or risk stale data)
     def take(self, address=None):
-        #if address:
-            #return self._address_pool(address).take()
+        # if address:
+        # return self._address_pool(address).take()
         # TODO (misc) is this best ?
         with self._lock:
             if address:
@@ -172,7 +173,7 @@ class SyncClusterConnectionPool:
 
     def take_by_key(self, key, **kwargs):
         if not isinstance(key, (bytes, bytearray)):
-            encode = kwargs.get('encoder', self._settings.get('encoder'))
+            encode = kwargs.get("encoder", self._settings.get("encoder"))
             key = parse_encoding(encode)(key)
         hashslot = calc_hashslot(key)
         return self._connection_by_hashslot(hashslot)
@@ -207,7 +208,7 @@ class SyncClusterConnectionPool:
                 command = [b"COMMAND", b"GETKEYS"]
                 command.extend(cmd)
                 # TODO (misc) what do we want to do if an exception happened here ?
-                encode = kwargs.get('encoder', self._settings.get('encoder'))
+                encode = kwargs.get("encoder", self._settings.get("encoder"))
                 command_info = conn(*command, encoder=encode, attributes=False, decoder=None)
                 key = command_info[0]
             except Error:
@@ -289,7 +290,7 @@ class SyncClusterConnectionPool:
                 if seen_moved:
                     self._update_slots()
 
-    def _on_all(self, *cmd, filter='master', **kwargs):
+    def _on_all(self, *cmd, filter="master", **kwargs):
         if self._clustered is None:
             self._update_slots()
         if self._clustered == False:

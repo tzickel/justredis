@@ -1,5 +1,5 @@
-from .connectionpool import SyncConnectionPool
-from .cluster import SyncClusterConnectionPool
+from .connectionpool import ConnectionPool
+from .cluster import ClusterConnectionPool
 from ..decoder import Error
 from ..utils import parse_url, merge_dicts
 
@@ -64,7 +64,7 @@ class Redis(ModifiedRedis):
         res.update(kwargs)
         return cls(**res)
 
-    def __init__(self, pool_factory=SyncClusterConnectionPool, **kwargs):
+    def __init__(self, pool_factory=ClusterConnectionPool, **kwargs):
         """
             Possible arguments:
             database (0): The default redis database number (SELECT) for this instance
@@ -97,9 +97,9 @@ class Redis(ModifiedRedis):
             tcp_nodelay
         """
         if pool_factory == "pool":
-            pool_factory = SyncConnectionPool
+            pool_factory = ConnectionPool
         elif pool_factory == "auto":
-            pool_factory = SyncClusterConnectionPool
+            pool_factory = ClusterConnectionPool
         # TODO (api) should we put the **settings here too ?
         super(Redis, self).__init__(pool_factory(**kwargs))
 

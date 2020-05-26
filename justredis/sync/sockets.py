@@ -12,7 +12,7 @@ elif sys.platform.startswith("win"):
     platform = "windows"
 
 
-class SyncSocketWrapper:
+class SocketWrapper:
     def __init__(self, buffersize=2 ** 16, **kwargs):
         self._buffer = bytearray(buffersize)
         self._view = memoryview(self._buffer)
@@ -24,7 +24,7 @@ class SyncSocketWrapper:
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=True, **kwargs):
         if address is None:
             address = ("localhost", 6379)
-        sock = socket.create_connection(address, connect_timeout) # AWAIT
+        sock = socket.create_connection(address, connect_timeout)  # AWAIT
         sock.settimeout(socket_timeout)
 
         if tcp_nodelay is not None:
@@ -45,18 +45,18 @@ class SyncSocketWrapper:
         self._socket = sock
 
     def send(self, data):
-        self._socket.sendall(data) # AWAIT
+        self._socket.sendall(data)  # AWAIT
 
     def recv(self, timeout=False):
         if timeout is not False:
             old_timeout = self._socket.gettimeout()
             self._socket.settimeout(timeout)
             try:
-                r = self._socket.recv_into(self._buffer) # AWAIT
+                r = self._socket.recv_into(self._buffer)  # AWAIT
             finally:
                 self._socket.settimeout(old_timeout)
         else:
-            r = self._socket.recv_into(self._buffer) # AWAIT
+            r = self._socket.recv_into(self._buffer)  # AWAIT
         return self._view[:r]
 
     def peername(self):
@@ -66,22 +66,22 @@ class SyncSocketWrapper:
         return peername
 
 
-class SyncUnixDomainSocketWrapper(SyncSocketWrapper):
+class UnixDomainSocketWrapper(SocketWrapper):
     def _create(self, address=None, connect_timeout=None, socket_timeout=None, **kwargs):
         if address is None:
             address = "/tmp/redis.sock"
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.settimeout(connect_timeout)
-        self._socket.connect(address) # AWAIT
+        self._socket.connect(address)  # AWAIT
         self._socket.settimeout(socket_timeout)
 
 
 # TODO Older python's might not have recv_into and I'll need to implment this from scratch
 # TODO how do cluster hostname work with SSL ?
 # TODO does closing this also close the socket itself ?
-class SyncSslSocketWrapper(SyncSocketWrapper):
+class SslSocketWrapper(SocketWrapper):
     def _create(self, address=None, ssl_context=None, **kwargs):
-        super(SyncSslSocketWrapper, self).__init__(address=address, **kwargs)
+        super(SslSocketWrapper, self).__init__(address=address, **kwargs)
         if address is None:
             address = ("localhost", 6379)
         if ssl_context is None:
