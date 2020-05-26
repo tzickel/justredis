@@ -56,43 +56,48 @@ def test_modify_database_cluster(cluster_client):
 
 
 def test_notallowed(client):
+    r = client
     with pytest.raises(Error) as exc_info:
-        client("auth", "asd")
+        r("auth", "asd")
     assert exc_info.value.args[0].startswith(b"ERR")
 
 
 def test_some_encodings(client):
+    r = client
     with pytest.raises(ValueError):
-        client("set", "a", True)
-    assert client("incrbyfloat", "float_check", 0.1) == b"0.1"
+        r("set", "a", True)
+    assert r("incrbyfloat", "float_check", 0.1) == b"0.1"
     with pytest.raises(ValueError):
-        client("set", "a", [1, 2])
-    client("set", "{check}_a", "a")
-    client("set", "{check}_b", "b")
-    assert client({"command": ("get", "{check}_a"), "decoder": "utf8"}) == "a"
-    assert client({"command": ("mget", "{check}_a", "{check}_b"), "decoder": "utf8"}) == ["a", "b"]
+        r("set", "a", [1, 2])
+    r("set", "{check}_a", "a")
+    r("set", "{check}_b", "b")
+    assert r({"command": ("get", "{check}_a"), "decoder": "utf8"}) == "a"
+    assert r({"command": ("mget", "{check}_a", "{check}_b"), "decoder": "utf8"}) == ["a", "b"]
 
 
 def test_chunk_encoded_command(client):
-    assert client("set", "test_chunk_encoded_command_a", b"test_chunk_encoded_command_a" * 10 * 1024) == b"OK"
-    assert client("get", "test_chunk_encoded_command_a") == b"test_chunk_encoded_command_a" * 10 * 1024
-    assert client("mget", "test_chunk_encoded_command_a" * 3500, "test_chunk_encoded_command_a" * 3500, "test_chunk_encoded_command_a" * 3500) == [None, None, None]
+    r = client
+    assert r("set", "test_chunk_encoded_command_a", b"test_chunk_encoded_command_a" * 10 * 1024) == b"OK"
+    assert r("get", "test_chunk_encoded_command_a") == b"test_chunk_encoded_command_a" * 10 * 1024
+    assert r("mget", "test_chunk_encoded_command_a" * 3500, "test_chunk_encoded_command_a" * 3500, "test_chunk_encoded_command_a" * 3500) == [None, None, None]
 
 
 def test_eval(client):
-    assert client("set", "evaltest", "a") == b"OK"
-    assert client("eval", "return redis.call('get',KEYS[1])", 1, "evaltest") == b"a"
-    assert client("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
-    assert client("eval", "return redis.call('get',KEYS[1])", 1, "evaltest") == b"a"
-    assert client("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
-    assert client("script", "flush") == b"OK"
-    assert client("eval", "return redis.call('get',KEYS[1])", 1, "evaltest") == b"a"
-    assert client("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
+    r = client
+    assert r("set", "evaltest", "a") == b"OK"
+    assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltest") == b"a"
+    assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
+    assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltest") == b"a"
+    assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
+    assert r("script", "flush") == b"OK"
+    assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltest") == b"a"
+    assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
 
 
 # TODO (misc) add some extra checks here for invalid states
 def test_multi(client):
-    with client.connection(key="a") as c:
+    r = client
+    with r.connection(key="a") as c:
         c("multi")
         c("set", "a", "b")
         c("get", "a")
@@ -100,17 +105,17 @@ def test_multi(client):
 
     # TODO (misc) kinda lame
     try:
-        with client.modify(database=2).connection(key="a") as c1:
+        with r.modify(database=2).connection(key="a") as c1:
             c1("multi")
             c1("set", "a", "b")
-            with client.modify(database=3).connection(key="a") as c2:
+            with r.modify(database=3).connection(key="a") as c2:
                 c2("multi")
                 c2("set", "a1", "c")
                 c2("get", "a")
                 assert c2("exec") == [b"OK", None]
             c1("mget", "a", "a1")
             assert c1("exec") == [b"OK", [b"b", None]]
-        assert client.modify(database=2)("get", "a") == b"b"
+        assert r.modify(database=2)("get", "a") == b"b"
     except Error as e:
         if e.args[0] == b"ERR SELECT is not allowed in cluster mode":
             pass
@@ -119,7 +124,8 @@ def test_multi(client):
 
 
 def test_multidiscard(client):
-    with client.connection(key="a") as c:
+    r = client
+    with r.connection(key="a") as c:
         c("multi")
         with pytest.raises(Error):
             c("nothing")
@@ -130,29 +136,31 @@ def test_multidiscard(client):
 
 
 def test_pubsub(client):
-    with client.connection(push=True) as pubsub:
-        pubsub("subscribe", "hi")
-        pubsub("psubscribe", b"bye")
-        assert pubsub.next_message() == [b"subscribe", b"hi", 1]
-        assert pubsub.next_message() == [b"psubscribe", b"bye", 2]
-        assert pubsub.next_message(timeout=0.1) == None
-        client("publish", "hi", "there")
-        assert pubsub.next_message(timeout=0.1) == [b"message", b"hi", b"there"]
-        client("publish", "bye", "there")
-        assert pubsub.next_message(timeout=0.1) == [b"pmessage", b"bye", b"bye", b"there"]
-        pubsub("ping")
+    r = client
+    with r.connection(push=True) as p:
+        p("subscribe", "hi")
+        p("psubscribe", b"bye")
+        assert p.next_message() == [b"subscribe", b"hi", 1]
+        assert p.next_message() == [b"psubscribe", b"bye", 2]
+        assert p.next_message(timeout=0.1) == None
+        r("publish", "hi", "there")
+        assert p.next_message(timeout=0.1) == [b"message", b"hi", b"there"]
+        r("publish", "bye", "there")
+        assert p.next_message(timeout=0.1) == [b"pmessage", b"bye", b"bye", b"there"]
+        p("ping")
         # RESP2 and RESP3 behave differently here, so check for both
-        assert pubsub.next_message() in (b"PONG", [b"pong", b""])
-        pubsub("ping", b"hi")
-        assert pubsub.next_message() in (b"hi", [b"pong", b"hi"])
-        pubsub("unsubscribe", "hi")
+        assert p.next_message() in (b"PONG", [b"pong", b""])
+        p("ping", b"hi")
+        assert p.next_message() in (b"hi", [b"pong", b"hi"])
+        p("unsubscribe", "hi")
 
 
 def test_misc(client):
+    r = client
     # This tests an command which redis server says keys start in index 2.
-    client("object", "help")
+    r("object", "help")
     # Check command with no keys
-    client("client", "list")
+    r("client", "list")
 
 
 def test_server_no_cluster(no_cluster_client):

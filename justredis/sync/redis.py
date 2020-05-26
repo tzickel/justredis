@@ -160,8 +160,9 @@ class Connection(ModifiedConnection):
 
 class PushConnection(Connection):
     def close(self):
-        # We close the connection here, since it's both hard to reset the state of the connection, and this is usually not done / at low frequency.
-        self._connection.close()
+        if self._connection:
+            # We close the connection here, since it's both hard to reset the state of the connection, and this is usually not done / at low frequency.
+            self._connection.close()
         super(PushConnection, self).close()
 
     def __call__(self, *cmd, **kwargs):
