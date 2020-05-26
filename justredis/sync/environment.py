@@ -9,7 +9,17 @@ class ThreadedEnvironment:
     def semaphore():
         from threading import Semaphore
 
-        return Semaphore
+        class OurSemaphore:
+            def __init__(self, value=None):
+                self._semaphore = Semaphore(value)
+
+            def release(self):
+                self._semaphore.release()
+
+            def acquire(self, blocking=True, timeout=None):
+                self._semaphore.acquire(blocking, timeout)
+
+        return OurSemaphore()
 
     @staticmethod
     def lock():

@@ -1,12 +1,11 @@
 from collections import deque
 from contextlib import contextmanager
-from threading import Semaphore
 
 
 from .connection import Connection
 from ..errors import ConnectionPoolError
 from ..decoder import Error
-
+from .environment import get_environment
 
 class ConnectionPool:
     def __init__(self, max_connections=None, wait_timeout=None, **connection_settings):
@@ -14,7 +13,7 @@ class ConnectionPool:
         self._wait_timeout = wait_timeout
         self._connection_settings = connection_settings
 
-        self._limit = Semaphore(max_connections) if max_connections else None
+        self._limit = get_environment(**connection_settings).semaphore(max_connections) if max_connections else None
         self._connections_available = deque()
         self._connections_in_use = set()
 
@@ -29,7 +28,7 @@ class ConnectionPool:
         for connection in self._connections_available:
             connection.close()
         self._connections_available.clear()
-        self._limit = Semaphore(self._max_connections) if self._max_connections else None
+        self._limit = get_environment(**connection_settings).semaphore(max_connections) if self._max_connections else None
 
     def take(self):
         # TODO (correctness) cluster depends on this failing if closed !
