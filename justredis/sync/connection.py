@@ -196,7 +196,7 @@ class Connection:
             raise TimeoutError()
         return res
 
-    def _commands(self, *cmds, **kwargs):
+    def _commands(self, *cmds, encoder=None, decoder=False, attributes=None, **kwargs):
         send = []
         recv = []
         for cmd in cmds:
