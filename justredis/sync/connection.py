@@ -1,12 +1,8 @@
-import socket
-
-
+from .environment import SocketTimeout, get_environment
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
 from ..utils import get_command_name, is_multiple_commands
-from .sockets import SocketWrapper, UnixDomainSocketWrapper, SslSocketWrapper
-
 
 not_allowed_commands = b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE"
 
@@ -20,17 +16,12 @@ timeout_error = TimeoutError()
 
 class Connection:
     # TODO (correctness) client_name with connection pool (?)
-    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory=SocketWrapper, connect_retry=2, database=0, **kwargs):
-        if socket_factory == "tcp":
-            socket_factory = SocketWrapper
-        elif socket_factory == "unix":
-            socket_factory = UnixDomainSocketWrapper
-        elif socket_factory == "ssl":
-            socket_factory = SslSocketWrapper
+    def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
+        environment = get_environment(**kwargs)
         connect_retry += 1
         while connect_retry:
             try:
-                self._socket = socket_factory(**kwargs)
+                self._socket = environment.socket(socket_factory, **kwargs)
                 break
             except Exception as e:
                 connect_retry -= 1
@@ -138,7 +129,7 @@ class Connection:
                             self._decoder.feed(data)
                     continue
                 return res
-        except socket.timeout:
+        except SocketTimeout:
             return timeout_error
         except Exception as e:
             self.close()
