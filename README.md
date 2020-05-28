@@ -156,7 +156,7 @@ ssl_context (None)
 
 ### Exceptions
 
-ValueError will be thrown 
+ValueError will be thrown when a
 
 ```python
 Error
@@ -235,4 +235,7 @@ While you do not have to pass a key, it's better to provide one you are about to
 
 ### RESP2 / RESP3 difference
 
+Since 
+
+Notice that by default, the client will use RESP2 communicate with because it doesn't decode ?
 TBD

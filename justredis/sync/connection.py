@@ -4,7 +4,8 @@ from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
 from ..utils import get_command_name, is_multiple_commands
 
-not_allowed_commands = b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE"
+
+not_allowed_push_commands = set([b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE"])
 
 
 class TimeoutError(Exception):
@@ -38,11 +39,12 @@ class Connection:
 
         connected = False
         if resp_version not in (-1, 2, 3):
-            raise Exception("Unsupported RESP protocol version %s" % resp_version)
+            raise ValueError("Unsupported RESP protocol version %s" % resp_version)
+        # Try to negotiate RESP3 first if RESP2 is not forced
         if resp_version != 2:
             args = [b"HELLO", b"3"]
-            if password:
-                if username:
+            if password is not None:
+                if username is not None:
                     args.extend((b"AUTH", username, password))
                 else:
                     args.extend((b"AUTH", b"default", password))
@@ -53,11 +55,10 @@ class Connection:
                 self._command(*args)
                 connected = True
             except Error as e:
-                # TODO (misc
-                # ) what to do about error encoding ?
                 # This is to seperate an login error from the server not supporting RESP3
                 if e.args[0].startswith(b"ERR"):
                     if resp_version == 3:
+                        # TODO (misc) this want have a __cause__ is that ok ? what exception to throw here ?
                         raise Exception("Server does not support RESP3 protocol")
                 else:
                     raise
@@ -71,19 +72,20 @@ class Connection:
             if client_name:
                 self._command(b"CLIENT", b"SETNAME", client_name)
         if database != 0:
-            self.command((b"SELECT", database))
+            self._command((b"SELECT", database))
 
     def __del__(self):
         self.close()
 
     def close(self):
-        try:
-            self._socket.close()
-        except Exception:
-            pass
-        self._socket = None
-        self._encoder = None
-        self._decoder = None
+        if self._socket:
+            try:
+                self._socket.close()
+            except Exception:
+                pass
+            self._socket = None
+            self._encoder = None
+            self._decoder = None
 
     # TODO (misc) better check ? (maybe it's closed, but the socket doesn't know it yet..., will be known the next time though)
     def closed(self):
@@ -176,7 +178,7 @@ class Connection:
         else:
             command = cmd
         command_name = get_command_name(command)
-        if command_name in not_allowed_commands:
+        if command_name in not_allowed_push_commands:
             raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
         if command_name == b"MULTI" and not self.allow_multi:
             raise ValueError("Take a connection if you want to use MULTI command.")
@@ -203,7 +205,7 @@ class Connection:
                 command = cmd
                 tmp_kwargs = kwargs
             command_name = get_command_name(command)
-            if command_name in not_allowed_commands:
+            if command_name in not_allowed_push_commands:
                 raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
             if command_name == b"MULTI" and not self.allow_multi:
                 raise ValueError("Take a connection if you want to use MULTI command.")
