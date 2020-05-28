@@ -65,6 +65,8 @@ class ConnectionPool:
             self._limit.release()
 
     def __call__(self, *cmd, **kwargs):
+        if not cmd:
+            raise ValueError("No command provided")
         conn = self.take()
         try:
             return conn(*cmd, **kwargs)

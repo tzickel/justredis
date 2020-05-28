@@ -156,6 +156,8 @@ ssl_context (None)
 
 ### Exceptions
 
+ValueError will be thrown 
+
 ```python
 Error
 RedisError
@@ -220,6 +222,8 @@ r("cluster", "info", endpoint="masters")
 ```
 
 You can also open a connection (for example to get key space notifications or monitor to a specific instance by adding ```endpoint=<the server address>```) to the connection() method.
+
+(*) Document about sending pipeline, in cluster, and about connection error with MOVED semantics.
 
 ### Connection commands
 

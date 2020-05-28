@@ -7,6 +7,7 @@ from .connectionpool import ConnectionPool
 from ..decoder import Error
 from ..utils import is_multiple_commands
 from ..encoder import parse_encoding
+from ..errors import CommunicationError
 
 
 def calc_hashslot(key):
@@ -25,7 +26,7 @@ def calc_hashslot(key):
 # TODO (misc) future optimization, if we can't take from last_connection beacuse of connection pool limit, choose another random one.
 # TODO (correctness) disable encoding on all of conn commands
 # TODO (correctness) when invalidating last_connection, run slots update ?
-
+# TODO (misc) should _update_slots be called on each I/O error always ?
 
 class ClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
@@ -76,12 +77,11 @@ class ClusterConnectionPool:
             raise
         finally:
             self.release(conn)
-        # Our test coverage should make sure RESP2/3 answer the same here
         # TODO (misc) what todo about holes in hashslots in response ?
         slots.sort(key=lambda x: x[0])
         slots = [(x[1], (x[2][0].decode(), x[2][1])) for x in slots]
         # We weren't in a cluster before, and we aren't now
-        if self._clustered == False:
+        if self._clustered == False and not self._slots:
             return
         # Remove connections which are not a part of the cluster anymore
         with self._lock:
@@ -103,7 +103,8 @@ class ClusterConnectionPool:
         if self._clustered == False:
             return self.take()
         if not self._slots:
-            raise Exception("Could not find any slots in the redis cluster")
+            # TODO (misc) Is this the correct exception type?
+            raise ValueError("Could not find any slots in the redis cluster")
         for slot in self._slots:
             if hashslot <= slot[0]:
                 break
@@ -125,7 +126,7 @@ class ClusterConnectionPool:
             return info
         conn = self.take()
         try:
-            command_info = conn(b"COMMAND", b"INFO", command, attributes=None, decoder=None)
+            command_info = conn(b"COMMAND", b"INFO", command, attributes=False, decoder=None)
         except Exception:
             # This is done to invalidate a potentially bad server, and pick up another one randomally next try
             self._last_connection = self._last_connection_peername = None
@@ -215,12 +216,13 @@ class ClusterConnectionPool:
                 encode = kwargs.get("encoder", self._settings.get("encoder"))
                 command_info = conn(*command, encoder=encode, attributes=False, decoder=None)
                 key = command_info[0]
+            # This happens if the command has no key info, so any connection is good
             except Error:
                 return self.take()
             finally:
                 self.release(conn)
         else:
-            # The command did not specify the key, usually this will result in a usage error ?
+            # The command does not contain the key, usually this will result in a usage error ?
             if len(cmd) - 1 < index:
                 return self.take()
             else:
@@ -233,7 +235,7 @@ class ClusterConnectionPool:
             address = conn.peername()
             pool = self._connections.get(address)
         else:
-            # TODO (correctness) risky, if last_connection somehow changed (multiple fallback address?), we might be returning to the wrong one, does it matter than ?!?
+            # TODO (correctness) risky, if last_connection somehow changed (multiple fallback address?), we might be returning to the wrong one, does it matter then ?!?
             pool = self._last_connection
         # The connection might have been discharged
         if pool is None:
@@ -242,6 +244,8 @@ class ClusterConnectionPool:
         pool.release(conn)
 
     def __call__(self, *cmd, endpoint=False, **kwargs):
+        if not cmd:
+            raise ValueError("No command provided")
         if endpoint == "masters":
             return self._on_all(*cmd, **kwargs)
         if self._clustered == False:
@@ -249,11 +253,12 @@ class ClusterConnectionPool:
         elif endpoint:
             conn = self.take(endpoint)
         else:
-            # TODO (misc) can we defend against _database != 0 here, when self_clustered is still None ? let just the server complaint and thats it...
             conn = self.take_by_cmd(*cmd, **kwargs)
-        # TODO (correctness) on I/O error, update slots as well...
         try:
             return conn(*cmd, **kwargs)
+        except CommunicationError:
+            self._update_slots()
+            raise
         finally:
             seen_moved = conn.seen_moved()
             self.release(conn)
@@ -264,7 +269,6 @@ class ClusterConnectionPool:
                 if endpoint == False and not is_multiple_commands(*cmd):
                     return self(*cmd, **kwargs)
 
-    # TODO (documentation) because of MOVED semantics, it's best that on exception you should re-get a new connection each time (even on watch error)
     @contextmanager
     def connection(self, key=None, endpoint=None, **kwargs):
         if key and endpoint:
@@ -274,12 +278,13 @@ class ClusterConnectionPool:
         elif self._clustered == False or key is None:
             conn = self.take()
         else:
-            # TODO (misc) defend against _database != 0
-            # TODO (correctness) encoding can be here in kwargs...
             conn = self.take_by_key(key, **kwargs)
-        # TODO (correctness) on I/O error, update slots as well...
         try:
+            conn.allow_multi(True)
             yield conn
+        except CommunicationError:
+            self._update_slots()
+            raise
         finally:
             # We need to clean up the connection back to a normal state.
             try:
@@ -290,6 +295,7 @@ class ClusterConnectionPool:
             finally:
                 # We need to handle the option where there was an moved error, to not have a recursion of a connection always trying the wrong server
                 seen_moved = conn.seen_moved()
+                conn.allow_multi(False)
                 self.release(conn)
                 if seen_moved:
                     self._update_slots()

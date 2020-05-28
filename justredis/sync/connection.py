@@ -168,7 +168,7 @@ class Connection:
     # TODO (correctness) if we see SELECT we should update it manually !
     def __call__(self, *cmd, database=None, **kwargs):
         if not cmd:
-            raise Exception()
+            raise ValueError("No command provided")
         self.set_database(database)
         if is_multiple_commands(*cmd):
             return self._commands(*cmd, **kwargs)
@@ -184,8 +184,11 @@ class Connection:
             kwargs.update(cmd)
         else:
             command = cmd
-        if get_command_name(command) in not_allowed_commands:
-            raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
+        command_name = get_command_name(command)
+        if command_name in not_allowed_commands:
+            raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
+        if command_name == b"MULTI" and not self.allow_multi:
+            raise ValueError("Take a connection if you want to use MULTI command.")
         self._send(*command, **kwargs)
         res = self._recv(**kwargs)
         if isinstance(res, Error):
@@ -208,8 +211,11 @@ class Connection:
             else:
                 command = cmd
                 tmp_kwargs = kwargs
-            if get_command_name(command) in not_allowed_commands:
-                raise Exception("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
+            command_name = get_command_name(command)
+            if command_name in not_allowed_commands:
+                raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
+            if command_name == b"MULTI" and not self.allow_multi:
+                raise ValueError("Take a connection if you want to use MULTI command.")
             send.append((command, tmp_kwargs))
             recv.append(tmp_kwargs)
         self._send(*send, multiple=True)
@@ -234,3 +240,6 @@ class Connection:
             self._seen_moved = False
             return True
         return False
+
+    def allow_multi(self, allow):
+        self._allow_multi = allow
