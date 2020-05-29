@@ -16,8 +16,13 @@ timeout_error = TimeoutError()
 
 
 class Connection:
-    # TODO (correctness) client_name with connection pool (?)
+    # TODO (api) client_name with connection pool (?)
+    # TODO (api) default to resp_version=2 ?
+    # TODO (documentation) the username/password/client_name need the decoding of whatever **kwargs is passed
     def __init__(self, username=None, password=None, client_name=None, resp_version=-1, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
+        if resp_version not in (-1, 2, 3):
+            raise ValueError("Unsupported RESP protocol version %s" % resp_version)
+
         environment = get_environment(**kwargs)
         connect_retry += 1
         while connect_retry:
@@ -38,8 +43,6 @@ class Connection:
         self._seen_moved = False
 
         connected = False
-        if resp_version not in (-1, 2, 3):
-            raise ValueError("Unsupported RESP protocol version %s" % resp_version)
         # Try to negotiate RESP3 first if RESP2 is not forced
         if resp_version != 2:
             args = [b"HELLO", b"3"]
@@ -58,7 +61,7 @@ class Connection:
                 # This is to seperate an login error from the server not supporting RESP3
                 if e.args[0].startswith(b"ERR"):
                     if resp_version == 3:
-                        # TODO (misc) this want have a __cause__ is that ok ? what exception to throw here ?
+                        # TODO (api) this want have a __cause__ is that ok ? what exception to throw here ?
                         raise Exception("Server does not support RESP3 protocol")
                 else:
                     raise
@@ -94,31 +97,31 @@ class Connection:
     def peername(self):
         return self._peername
 
-    def _send(self, *cmd, multiple=False, encoder=None, **kwargs):
+    # TODO (misc) an encoding error will close the connection (this can be fixed though)
+    def _send(self, *cmd, multiple=False, **kwargs):
         try:
             if multiple:
                 for _cmd in cmd:
                     self._encoder.encode(*_cmd[0], **_cmd[1])
             else:
-                self._encoder.encode(*cmd, encoder=encoder)
+                self._encoder.encode(*cmd, **kwargs)
             while True:
                 data = self._encoder.extract()
                 if data is None:
                     break
-                try:
-                    self._socket.send(data)
-                except Exception as e:
-                    raise CommunicationError() from e
-        # TODO BaseException ?
-        except Exception:
+                self._socket.send(data)
+        except ValueError as e:
             self.close()
-            raise
+            raise CommunicationError("Data encoding error while trying to send a command") from e
+        except Exception as e:
+            self.close()
+            raise CommunicationError("I/O error while trying to send a command") from e
 
     # TODO (misc) should a decoding error be considered an CommunicationError ?
-    def _recv(self, timeout=False, decoder=False, attributes=None, **kwargs):
+    def _recv(self, timeout=False, **kwargs):
         try:
             while True:
-                res = self._decoder.extract(decoder=decoder, with_attributes=attributes)
+                res = self._decoder.extract(**kwargs)
                 if res == need_more_data:
                     if self._seen_eof:
                         self.close()
@@ -135,18 +138,29 @@ class Connection:
             return timeout_error
         except Exception as e:
             self.close()
-            raise CommunicationError() from e
+            raise CommunicationError("I/O error while trying to read a reply") from e
 
-    def pushed_message(self, timeout=False, decoder=False, **kwargs):
-        res = self._recv(timeout, decoder)
+    def pushed_message(self, **kwargs):
+        res = self._recv(**kwargs)
         if res == timeout_error:
             return None
         return res
 
-    # TODO (api) should have encoding as well ?
-    # TODO (misc) don't accept multiple commands here
     def push_command(self, *cmd, **kwargs):
-        self._send(*cmd)
+        if is_multiple_commands(*cmd):
+            self._send(*cmd, **kwargs)
+        else:
+            send = []
+            for _cmd in cmd:
+                if isinstance(_cmd, dict):
+                    command = _cmd.pop("command")
+                    tmp_kwargs = kwargs.copy()
+                    tmp_kwargs.update(_cmd)
+                else:
+                    command = _cmd
+                    tmp_kwargs = kwargs
+                send.append((command, tmp_kwargs))
+            self._send(*send, multiple=True)
 
     def set_database(self, database):
         if database is None:
@@ -158,7 +172,7 @@ class Connection:
                 self._command(b"SELECT", database)
                 self._last_database = database
 
-    # TODO (correctness) if we see SELECT we should update it manually !
+    # TODO (correctness) if we see SELECT we should update it manually ! what about SELECT in scripts, etc :/
     def __call__(self, *cmd, database=None, **kwargs):
         if not cmd:
             raise ValueError("No command provided")

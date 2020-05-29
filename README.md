@@ -1,10 +1,16 @@
 ## What ?
 
-A redis client for Python
+A Redis client for Python
 
 Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
 
 ## Why ?
+
+The Redis client <-> server interaction is a pretty complex beast. The Python landscape is pretty fragmented with multiple libraries, each providing it's own feature set, and each feature is implmeneted differently.
+
+Since there is an OK seperation between the client <-> server interaction to the actual command and their replies, this library tries to focus on implementing all the interaction parts while leaving room for registering command processor classes.
+
+## What do I get ?
 
 - Transparent API (Just call the redis commands, and the library will figure out cluster api, script caching, etc...)
 - Cluster support
@@ -239,3 +245,14 @@ Since
 
 Notice that by default, the client will use RESP2 communicate with because it doesn't decode ?
 TBD
+
+## Thread safety
+
+
+## Open questions
+
+### Exception args[0] encoding
+
+bytes or utf-8 string or what ? make a type option ?
+
+### Registe extranl command support

@@ -2,6 +2,9 @@ import socket
 import sys
 
 
+# TODO (correctness) timeout handling in recv should be done here !!!!!
+
+
 platform = ""
 if sys.platform.startswith("linux"):
     platform = "linux"
