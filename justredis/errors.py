@@ -12,3 +12,7 @@ class ConnectionPoolError(RedisError):
 
 class ProtocolError(RedisError):
     pass
+
+
+class PipelinedExceptions(RedisError):
+    pass

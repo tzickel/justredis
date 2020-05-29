@@ -3,9 +3,9 @@ from collections import OrderedDict
 from .errors import ProtocolError
 
 
+# TODO (api) should Exceptions be bytes, or strings with utf-8 and ignore errors (since it's just a blob)?
 # TODO (misc) We can add helpful error messages on which part the parsing failed, should we do that ?
-# TODO (misc) Should we make ProtocolError the catchall chain ?
-# TODO (misc) For now exceptions aren't encoded and are always bytes (are they always guarrented to be ascii from the redis server, i.e. have no blob name) ?
+# TODO (misc) Should we make ProtocolError the catch all chain ?
 # TODO (misc) There is allot of code duplication here, we can merge most of it.
 
 

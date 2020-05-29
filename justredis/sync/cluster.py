@@ -4,7 +4,7 @@ from random import choice
 
 from .environment import get_environment
 from .connectionpool import ConnectionPool
-from ..decoder import Error
+from ..decoder import Error, Result
 from ..utils import is_multiple_commands
 from ..encoder import parse_encoding
 from ..errors import CommunicationError
@@ -49,16 +49,19 @@ class ClusterConnectionPool:
         self._clustered = None
         # Command info results
         self._command_cache = {}
+        self._closed = False
 
     def __del__(self):
         self.close()
 
     def close(self):
         with self._lock:
-            for pool in self._connections.values():
-                pool.close()
-            self._connections.clear()
-            self._last_connection = None
+            if not self._closed:
+                for pool in self._connections.values():
+                    pool.close()
+                self._connections.clear()
+                self._last_connection = None
+            self._closed = True
 
     def _update_slots(self):
         # TODO (misc) or if there is a hint from MOVED, recheck if clustered?
@@ -66,7 +69,7 @@ class ClusterConnectionPool:
             return
         conn = self.take()
         try:
-            slots = conn(b"CLUSTER", b"SLOTS", attributes=False, decoder=None)
+            slots = conn(b"CLUSTER", b"SLOTS")
             self._clustered = True
         except Error:
             slots = []
@@ -78,8 +81,13 @@ class ClusterConnectionPool:
         finally:
             self.release(conn)
         # TODO (misc) what todo about holes in hashslots in response ?
+        if isinstance(slots, Result):
+            slots = slots.data
         slots.sort(key=lambda x: x[0])
-        slots = [(x[1], (x[2][0].decode(), x[2][1])) for x in slots]
+        if slots and isinstance(slots[0][2][0], bytes):
+            slots = [(x[1], (x[2][0].decode(), x[2][1])) for x in slots]
+        else:
+            slots = [(x[1], (x[2][0], x[2][1])) for x in slots]
         # We weren't in a cluster before, and we aren't now
         if self._clustered == False and not self._slots:
             return
@@ -113,9 +121,6 @@ class ClusterConnectionPool:
 
     def _get_info_for_command(self, *cmd):
         # commands are ascii, yes ? some commands can be larger than cmd[0] for index ? meh, let's be optimistic for now
-        # TODO (misc) refactor this to utils
-        if isinstance(cmd[0], dict):
-            cmd = cmd[0]["command"]
         command = cmd[0]
         encode = getattr(command, "encode", None)
         if encode:
@@ -126,13 +131,15 @@ class ClusterConnectionPool:
             return info
         conn = self.take()
         try:
-            command_info = conn(b"COMMAND", b"INFO", command, attributes=False, decoder=None)
+            command_info = conn(b"COMMAND", b"INFO", command)
         except Exception:
             # This is done to invalidate a potentially bad server, and pick up another one randomally next try
             self._last_connection = self._last_connection_peername = None
             raise
         finally:
             self.release(conn)
+        if isinstance(command_info, Result):
+            command_info = command_info.data
         command_info = command_info[0]
         # TODO (misc) on null, cache it too ?
         if command_info:
@@ -203,8 +210,6 @@ class ClusterConnectionPool:
         # This should happen only if command doesn't exist
         if info is None:
             return self.take()
-        if isinstance(cmd[0], dict):
-            cmd = cmd[0]["command"]
         # TODO (misc) maybe see if command is movablekeys, and only do this then, for optimizations
         index = info[3]
         if index == 0:
@@ -247,15 +252,15 @@ class ClusterConnectionPool:
         if not cmd:
             raise ValueError("No command provided")
         if endpoint == "masters":
-            return self._on_all(*cmd, **kwargs)
+            return self._on_all(*cmd)
         if self._clustered == False:
             conn = self.take()
         elif endpoint:
             conn = self.take(endpoint)
         else:
-            conn = self.take_by_cmd(*cmd, **kwargs)
+            conn = self.take_by_cmd(*cmd)
         try:
-            return conn(*cmd, **kwargs)
+            return conn(*cmd)
         except CommunicationError:
             self._update_slots()
             raise
@@ -306,6 +311,7 @@ class ClusterConnectionPool:
         if self._clustered == False:
             # This will be always filled by the _update_slots (atleast)
             return {self._last_connection_peername: self(*cmd, **kwargs)}
+        # TODO (api) on an error here, raise an exception ?
         res = {}
         for address in self.endpoints():
             if address[1]["type"] != filter:

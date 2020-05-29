@@ -71,8 +71,8 @@ def test_some_encodings(client):
         r("set", "a", [1, 2])
     r("set", "{check}_a", "a")
     r("set", "{check}_b", "b")
-    assert r({"command": ("get", "{check}_a"), "decoder": "utf8"}) == "a"
-    assert r({"command": ("mget", "{check}_a", "{check}_b"), "decoder": "utf8"}) == ["a", "b"]
+    assert r("get", "{check}_a", decoder="utf8") == "a"
+    assert r("mget", "{check}_a", "{check}_b", decoder="utf8") == ["a", "b'"]
 
 
 def test_chunk_encoded_command(client):
