@@ -1,4 +1,4 @@
-from .environment import SocketTimeout, get_environment
+from .environment import get_environment
 from ..decoder import RedisRespDecoder, RedisResp2Decoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError
@@ -130,12 +130,12 @@ class Connection:
                         data = self._socket.recv(timeout)
                         if data == b"":
                             self._seen_eof = True
+                        elif data is None:
+                            return timeout_error
                         else:
                             self._decoder.feed(data)
                     continue
                 return res
-        except SocketTimeout:
-            return timeout_error
         except Exception as e:
             self.close()
             raise CommunicationError("I/O error while trying to read a reply") from e

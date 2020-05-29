@@ -2,9 +2,6 @@ import socket
 import sys
 
 
-# TODO (correctness) timeout handling in recv should be done here !!!!!
-
-
 platform = ""
 if sys.platform.startswith("linux"):
     platform = "linux"
@@ -77,13 +74,17 @@ class SocketWrapper:
     def send(self, data):
         self._socket.sendall(data)  # AWAIT
 
+    # If you override this, make sure to return an empty bytes for EOF and a None for timeout !
     def recv(self, timeout=False):
         if timeout is not False:
             old_timeout = self._socket.gettimeout()
             self._socket.settimeout(timeout)
             try:
                 r = self._socket.recv_into(self._buffer)  # AWAIT
+            except socket.timeout:
+                return None
             finally:
+                # TODO (misc) if the socket is closed already may this fail again use else ?
                 self._socket.settimeout(old_timeout)
         else:
             r = self._socket.recv_into(self._buffer)  # AWAIT
