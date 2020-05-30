@@ -94,6 +94,11 @@ def test_eval(client):
     assert r("eval", "return redis.call('get',KEYS[1])", 1, "evaltestno") == None
 
 
+def test_pipeline(client):
+    r = client
+    assert r(("set", "abc", "def"), ("get", "abc")) == [b"OK", b"def"]
+
+
 # TODO (misc) add some extra checks here for invalid states
 def test_multi(client):
     r = client

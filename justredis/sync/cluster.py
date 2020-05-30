@@ -28,6 +28,7 @@ def calc_hashslot(key):
 # TODO (correctness) when invalidating last_connection, run slots update ?
 # TODO (misc) should _update_slots be called on each I/O error always ?
 
+
 class ClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
         if addresses is None:

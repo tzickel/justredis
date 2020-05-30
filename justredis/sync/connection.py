@@ -146,9 +146,9 @@ class Connection:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
             if decode is not False:
-                kwargs['decoder'] = decoder
+                kwargs["decoder"] = decoder
             if attributes is not None:
-                kwargs['attributes'] = attributes
+                kwargs["attributes"] = attributes
             self._decoder = RedisRespDecoder(**kwargs)
         try:
             res = self._recv(timeout)
@@ -181,9 +181,9 @@ class Connection:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
             if decoder is not False:
-                kwargs['decoder'] = decoder
+                kwargs["decoder"] = decoder
             if attributes is not None:
-                kwargs['attributes'] = attributes
+                kwargs["attributes"] = attributes
             self._decoder = RedisRespDecoder(**kwargs)
         try:
             self.set_database(database)

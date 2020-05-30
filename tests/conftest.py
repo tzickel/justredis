@@ -11,7 +11,7 @@ def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
     instance = redis_server.RedisServer(dockerimage=dockerimage, extraparams=extraparams)
-    with Redis(address=("localhost", instance.port), **kwargs) as r:
+    with Redis(address=("localhost", instance.port), resp_version=-1, **kwargs) as r:
         try:
             yield r
         finally:
@@ -24,7 +24,7 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
     servers, stdout = redis_server.start_cluster(3, dockerimage=dockerimage, extraparams=extraparams)
-    with Redis(address=("localhost", servers[0].port)) as r:
+    with Redis(address=("localhost", servers[0].port), resp_version=-1) as r:
         import time
 
         wait = 60

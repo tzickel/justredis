@@ -175,8 +175,6 @@ RedisError - Will be thrown when an internal logic error has happened.
     ProtocolError - Invalid input from the server.
 ```
 
-(*) PIpelinedException
-
 ## Redis command replacements
 
 The following Redis commands should not be called directly, but via the library API:
@@ -226,7 +224,9 @@ Check the transaction or pubsub examples above for syntax usage.
 
 ### Pipelining
 
-TBD
+You can pipeline multiple commands together by passing an list of commands to be sent together. This is usually to have better latency.
+
+(*) Document cluster support + transaction
 
 ### Cluster commands
 

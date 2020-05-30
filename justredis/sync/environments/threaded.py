@@ -63,7 +63,7 @@ def sslsocket(address=None, ssl_context=None, **kwargs):
 
 
 class SocketWrapper:
-    def __init__(self, socket_factory, buffersize=2**16, **kwargs):
+    def __init__(self, socket_factory, buffersize=2 ** 16, **kwargs):
         self._buffer = bytearray(buffersize)
         self._view = memoryview(self._buffer)
         self._socket = socket_factory(**kwargs)
@@ -123,7 +123,7 @@ class ThreadedEnvironment:
                 self._semaphore.release()
 
             def acquire(self, blocking=True, timeout=None):
-                self._semaphore.acquire(blocking, timeout) # AWAIT
+                self._semaphore.acquire(blocking, timeout)  # AWAIT
 
         return OurSemaphore()
 
