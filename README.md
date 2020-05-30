@@ -165,7 +165,7 @@ endpoint (False)
 
 ### Exceptions
 
-```python
+```
 ValueError - Will be thrown when an invalid input was given. Nothing will be sent to the server.
 Error - Will be thrown when the server returned an error.
 PipelinedExceptions - Will be thrown when some of the pipeline failed.
@@ -204,11 +204,11 @@ with r.modify(database=2) as r1:
 
 ### Transaction (WATCH / MULTI / EXEC / DISCARD)
 
-To use the transaction commands, you must take a connection, and use all the commands inside. Please read the Connection section below for more details.
+To use the transaction commands, you must take a connection, and use all the commands inside. Please read the [Connection section](#connection-commands) below for more details.
 
 ### Pubsub and monitor (SUBSCRIBE / PSUBSCRIBE / UNSUBSCRIBE / PUNSUBSCRIBE / MONITOR)
 
-To use push commands, you must take a push connection, and use all the commands inside. Please read the Connection section below for more details.
+To use push commands, you must take a push connection, and use all the commands inside. Please read the [Connection section](#connection-commands) below for more details.
 
 ## Usage
 
@@ -216,7 +216,7 @@ To use push commands, you must take a push connection, and use all the commands 
 
 The connection() method is required to be used for sending multiple commands to the same server or to talk to the server in push mode (pub/sub & monitor).
 
-You can pass to the method push=True for push mode (else it defaults to a normal connection).
+You can pass to the method ```push=True``` for push mode (else it defaults to a normal connection).
 
 While you do not have to pass a key, it's better to provide one you are about to use inside, in case you want to talk to a cluster later on.
 
