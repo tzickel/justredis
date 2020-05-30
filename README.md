@@ -27,7 +27,6 @@ Since there is an OK seperation between the client <-> server interaction to the
 
 ## Not on roadmap (for now?)
 
-- Hiredis support
 - Sentinal support
 - High level features which are not part of the redis specification (such as locks, retry transactions, etc...)
 - Manual command interface (maybe for special stuff like bit operations?)

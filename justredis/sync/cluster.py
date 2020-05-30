@@ -218,8 +218,7 @@ class ClusterConnectionPool:
                 command = [b"COMMAND", b"GETKEYS"]
                 command.extend(cmd)
                 # TODO (misc) what do we want to do if an exception happened here ?
-                encode = kwargs.get("encoder", self._settings.get("encoder"))
-                command_info = conn(*command, encoder=encode, attributes=False, decoder=None)
+                command_info = conn(*command, attributes=False, decoder=None)
                 key = command_info[0]
             # This happens if the command has no key info, so any connection is good
             except Error:
@@ -260,7 +259,7 @@ class ClusterConnectionPool:
         else:
             conn = self.take_by_cmd(*cmd)
         try:
-            return conn(*cmd)
+            return conn(*cmd, **kwargs)
         except CommunicationError:
             self._update_slots()
             raise

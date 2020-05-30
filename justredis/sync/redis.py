@@ -37,14 +37,15 @@ class ModifiedRedis:
         if args:
             raise ValueError("Please specify the connection arguments as named arguments (i.e. push=..., key=...)")
         wrapper = PushConnection if push else Connection
-        settings = merge_dicts(self._settings, kwargs)
+        #settings = merge_dicts(self._settings, kwargs)
         # TODO (api) should we put the **settings here too ?
-        if settings is None:
-            conn = self._connection_pool.connection()
-            return wrapper(conn)
-        else:
-            conn = self._connection_pool.connection(**settings)
-            return wrapper(conn, **settings)
+        #if settings is None:
+            #conn = self._connection_pool.connection()
+            #return wrapper(conn)
+        #else:
+            #conn = self._connection_pool.connection(**settings)
+            #return wrapper(conn, **settings)
+        return wrapper(self._connection_pool.connection(**kwargs), **self._settings)
 
     def endpoints(self):
         return self._connection_pool.endpoints()
@@ -100,7 +101,6 @@ class Redis(ModifiedRedis):
             pool_factory = ConnectionPool
         elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
-        # TODO (api) should we put the **settings here too ?
         super(Redis, self).__init__(pool_factory(**kwargs))
 
     def __del__(self):
@@ -152,6 +152,7 @@ class Connection(ModifiedConnection):
 
     def close(self):
         if self._connection_context:
+            # TODO (correctness) is this correct?
             self._connection_context.__exit__(None, None, None)
         self._connection = None
         self._connection_context = None

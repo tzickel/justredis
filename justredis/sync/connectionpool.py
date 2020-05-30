@@ -81,7 +81,7 @@ class ConnectionPool:
             raise ValueError("No command provided")
         conn = self.take()
         try:
-            return conn(*cmd)
+            return conn(*cmd, **kwargs)
         finally:
             self.release(conn)
 

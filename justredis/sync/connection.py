@@ -5,7 +5,10 @@ from ..errors import CommunicationError, PipelinedExceptions
 from ..utils import get_command_name, is_multiple_commands
 
 
-not_allowed_push_commands = set([b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE", b"SELECT"])
+# TODO (correctness) watch for manual SELECT and set_database !
+
+
+not_allowed_push_commands = set([b"MONITOR", b"SUBSCRIBE", b"PSUBSCRIBE", b"UNSUBSCRIBE", b"PUNSUBSCRIBE"])
 
 
 class TimeoutError(Exception):
@@ -21,6 +24,8 @@ class Connection:
     def __init__(self, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
         if resp_version not in (-1, 2, 3):
             raise ValueError("Unsupported RESP protocol version %s" % resp_version)
+
+        self._settings = kwargs
 
         environment = get_environment(**kwargs)
         connect_retry += 1
@@ -38,6 +43,7 @@ class Connection:
         self._peername = self._socket.peername()
         self._seen_moved = False
         self._allow_multi = False
+        self._default_database = self._last_database = database
 
         connected = False
         # Try to negotiate RESP3 first if RESP2 is not forced
@@ -133,22 +139,61 @@ class Connection:
             self.close()
             raise CommunicationError("Error while trying to read a reply") from e
 
-    def pushed_message(self):
-        res = self._recv()
-        if res == timeout_error:
-            return None
-        return res
+    def pushed_message(self, timeout=False, decoder=False, attributes=None):
+        orig_decoder = None
+        # TODO (correctness) != or is not
+        if decoder is not False or attributes is not None:
+            orig_decoder = self._decoder
+            kwargs = self._settings.copy()
+            if decode is not False:
+                kwargs['decoder'] = decoder
+            if attributes is not None:
+                kwargs['attributes'] = attributes
+            self._decoder = RedisRespDecoder(**kwargs)
+        try:
+            res = self._recv(timeout)
+            if res == timeout_error:
+                return None
+            return res
+        finally:
+            if orig_decoder is not None:
+                self._decoder = orig_decoder
 
     def push_command(self, *cmd):
         self._send(*cmd)
 
-    def __call__(self, *cmd):
+    def set_database(self, database):
+        if database is None:
+            if self._default_database != self._last_database:
+                self._command(b"SELECT", self._default_database)
+                self._last_database = self._default_database
+        else:
+            if database != self._last_database:
+                self._command(b"SELECT", database)
+                self._last_database = database
+
+    def __call__(self, *cmd, decoder=False, attributes=None, database=None):
         if not cmd:
             raise ValueError("No command provided")
-        if is_multiple_commands(*cmd):
-            return self._commands(*cmd)
-        else:
-            return self._command(*cmd)
+        orig_decoder = None
+        # TODO (correctness) != or is not
+        if decoder is not False or attributes is not None:
+            orig_decoder = self._decoder
+            kwargs = self._settings.copy()
+            if decoder is not False:
+                kwargs['decoder'] = decoder
+            if attributes is not None:
+                kwargs['attributes'] = attributes
+            self._decoder = RedisRespDecoder(**kwargs)
+        try:
+            self.set_database(database)
+            if is_multiple_commands(*cmd):
+                return self._commands(*cmd)
+            else:
+                return self._command(*cmd)
+        finally:
+            if orig_decoder is not None:
+                self._decoder = orig_decoder
 
     def _command(self, *cmd):
         command_name = get_command_name(cmd)
