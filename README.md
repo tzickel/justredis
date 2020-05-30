@@ -6,12 +6,6 @@ Please note that this project is currently alpha quality and the API is not fina
 
 ## Why ?
 
-The Redis client <-> server interaction is a pretty complex beast. The Python landscape is pretty fragmented with multiple libraries, each providing it's own feature set, and each feature is implmeneted differently.
-
-Since there is an OK seperation between the client <-> server interaction to the actual command and their replies, this library tries to focus on implementing all the interaction parts while leaving room for registering command processor classes.
-
-## What do I get ?
-
 - Transparent API (Just call the Redis commands, and the library will figure out cluster api, script caching, etc...)
 - Cluster support
 - RESP2 & RESP3 support
@@ -102,13 +96,13 @@ with r.connection(push=True) as p:
 Redis(**kwargs)
     @classmethod
     from_url(url, **kwargs)
-    __enter__() / __exit__(*args)
+    __enter__() / __exit__()
     close()
     __call__(*cmd, **kwargs)
     endpoints()
     modify(**kwargs) # Returns a modified settings instance (while sharing the pool)
     connection(*args, push=False, **kwargs)
-        __enter__() / __exit__(*args)
+        __enter__() / __exit__()
         close()
         __call__(*cmd, **kwargs) # On push connection no result for calls
         modify(**kwargs) # Returns a modified settings instance (while sharing the connection)
@@ -126,42 +120,78 @@ This are the Redis constructor options:
 pool_factory ("auto")
     "auto" / "cluster" - Try to figure out automatically what the Redis server type is (currently cluster / no-cluster)
     "pool" - Force non cluster aware connection pool
+environment ("threaded")
+    "threaded" - The default builtin native synchronous constructs
 address (None)
-    An (address, port) tuple for tcp sockets. The default is (localhost, 6379)
-    An string if it's a path for unix domain sockets
-addresses (None) - Only relevent for cluster mode for now
-    Multiple (address, port) tuples for cluster ips for fallback. The default is ((localhost, 6379), )
+    An (address, port) tuple for tcp sockets, the default is (localhost, 6379)
+    An string if it's a path for unix domain sockets, the default is "/tmp/redis.sock"
 username (None)
-    If you have an ACL username, specify it here (expects utf-8 encoding if string)
+    If you have an ACL username, specify it here
 password (None)
-    If you have an AUTH / ACL password, specify it here (expects utf-8 encoding if string)
+    If you have an AUTH / ACL password, specify it here
 client_name (None)
-    If you want your client to be named on connection specify it here (expects utf-8 encoding if string)
-resp_version (-1)
+    If you want your client to be named on connection specify it here
+resp_version (2)
     Specifies which RESP protocol version to use for connections, -1 = auto detect, else 2 or 3
 socket_factory ("tcp")
-    Specifies which socket type to use
+    Specifies which socket type to use to connect to the redis server
+    "tcp" tcp socket
+    "unix" unix domain socket
+    "ssl" tcp ssl socket
 connect_retry (2)
     How many attempts to retry connecting when establishing a new connection
 max_connections (None)
-    How many maximum concurrent connections to keep to the server in the connection pool. The default is unlimited
+    How many maximum concurrent connections to keep to the server in the connection pool, the default is unlimited
 wait_timeout (None)
-    How long (float seconds) to wait for a connection when the connection pool is full before returning an timeout error. The default is unlimited
+    How long (float seconds) to wait for a connection when the connection pool is full before returning an timeout error, the default is unlimited
 cutoff_size (6000)
-    The maximum ammount of bytes that will be tried to be appended before sending data to the socket
-environment
-connect_timeout (None)
-socket_timeout (None)
-tcp_keepalive (None)
-tcp_nodelay (True)
-ssl_context (None)
-
-decoder (None)
+    The maximum ammount of bytes that will be appended together instead of sent seperatly before sending data to the socket, 0 to disable this feature
+custom_command_class (None)
+    Register a custom class to extend redis server commands handling
 encoder (None)
-attributes (False)
-database (None)
-endpoint (False)
+    Specify how to encode strings to bytes, it can be a string, list or dictionary that are passed directly as the parameters to str.encode, the default is "utf8"
+connect_timeout (None)
+    How many (float seconds) to wait for a connection with a server to be established, the default is unlimited
+socket_timeout (None)
+    How many (float seconds) to wait for a socket operation (read/write) with a server, the default is unlimited    
 ```
+
+This parameters can be passed to the Redis constructor, or to the ```modify()``` method or per call:
+```
+decoder (None)
+    Specify how to decode the string results from the server, it can be a string, list or dictionary that are passed directly as parameters to bytes.decode, the default is normal bytes conversion
+attributes (False)
+    Specify if you want to handle the attributes fields from the RESP3 protocol (read the special section about this in the readme)
+database (None)
+    Set which database to operate on the server, the default is 0
+```
+
+This can be provided to the Redis constructor if you are using the cluster:
+```
+addresses (None) - Only relevent for cluster mode for now
+    Multiple (address, port) tuples for cluster ips for fallback. The default is ((localhost, 6379), )
+```
+
+This can be provided to the Redis constructor for tcp & ssl connections:
+```
+tcp_keepalive (None)
+    How many seconds to check the TCP connection liveness, the default is disabled
+tcp_nodelay (True)
+    Enable or disable the TCP nodelay algorithm
+```
+
+This can be provided to the Redis constructor for SSL connections:
+```
+ssl_context (None)
+    An Python SSL context object, the default is Python's ssl.create_default_context
+```
+
+Document this as well:
+key
+push
+This can be provided to connection() or __call__():
+endpoint (False)
+
 
 ### Exceptions
 
@@ -220,7 +250,7 @@ You can pass to the method ```push=True``` for push mode (else it defaults to a 
 
 While you do not have to pass a key, it's better to provide one you are about to use inside, in case you want to talk to a cluster later on.
 
-Check the transaction or pubsub examples above for syntax usage.
+Check the [transaction or pubsub examples](#examples) above for syntax usage.
 
 ### Pipelining
 
@@ -272,12 +302,36 @@ If attributes is disabled, you will get the direct Python mapping of the results
 
 (*) Document about the type system more ?
 
-## Thread safety
+### Thread safety
 
 The library is thread safe, except passing connections between threads.
 
-## Open questions
+### Modify
 
-### Registering external command support
+You can use the modify() methods both in the Redis instance, and in the commands to change parameters such as decoding, database number, check the [examples](#examples) above to see how it's done.
 
-How should we provide a way to register type safe command calling in Python, with the modify option ?
+## Extending the library with more command support
+
+You can extend the Redis object to support real redis commands, and not just calling them raw, here is an example:
+
+```python
+from justredis import Redis
+
+
+class CustomCommands:
+    def __init__(self, base):
+        self._base = base
+
+    def get(self, key, **kwargs):
+        return self._base("get", key, **kwargs)
+
+    def set(self, key, value, **kwargs):
+        return self._base("set", key, value, **kwargs)
+
+
+r = Redis(custom_command_class=CustomCommands)
+r.set("hi", "there")
+assert r.get("hi", decoder="utf8") == "hi"
+with r.modify(database=1) as r1:
+    assert r1.get("hi") == None
+```

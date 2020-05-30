@@ -10,8 +10,10 @@ from ..utils import parse_url, merge_dicts
 
 # We do this seperation to allow changing per command and connection settings easily
 class ModifiedRedis:
-    def __init__(self, connection_pool, **kwargs):
+    def __init__(self, connection_pool, custom_command_class=None, **kwargs):
         self._connection_pool = connection_pool
+        self._custom_command_class = custom_command_class
+        self._custom_command = custom_command_class(self) if self._custom_command_class else None
         self._settings = kwargs
 
     def __del__(self):
@@ -45,11 +47,15 @@ class ModifiedRedis:
     def modify(self, **kwargs):
         settings = self._settings.copy()
         settings.update(kwargs)
-        return ModifiedRedis(self._connection_pool, **settings)
+        return ModifiedRedis(self._connection_pool, custom_command_class=self._custom_command_class, **settings)
+
+    def __getattr__(self, attribute):
+        if not self._custom_command:
+            raise AttributeError("No such attribute: %s" % attribute)
+        return getattr(self._custom_command, attribute)
 
 
 # TODO (api) should we implement an callback for when slots have changed ?
-# TODO (api) allow some registration method for speacialized commands ?
 class Redis(ModifiedRedis):
     @classmethod
     def from_url(cls, url, **kwargs):
@@ -57,43 +63,15 @@ class Redis(ModifiedRedis):
         res.update(kwargs)
         return cls(**res)
 
-    def __init__(self, pool_factory=ClusterConnectionPool, **kwargs):
+    def __init__(self, pool_factory=ClusterConnectionPool, custom_command_class=None, **kwargs):
         """
-            Possible arguments:
-            database (0): The default redis database number (SELECT) for this instance
-            pool_factory ('auto'): 
-
-            decoder (bytes): By default strings are kept as bytes, 'unicode'
-            encoder
-            username
-            password
-            client_name
-            resp_version
-            socket_factory
-            connect_retry
-            buffersize
-            For any pool:
-
-            addresses
-
-            # For all connection pools
-            max_connections
-            wait_timeout
-            
-            # For all sockets
-            address
-            connect_timeout
-            socket_timeout
-
-            # For TCP based sockets
-            tcp_keepalive
-            tcp_nodelay
+            Currently documented in README.md
         """
         if pool_factory == "pool":
             pool_factory = ConnectionPool
         elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
-        super(Redis, self).__init__(pool_factory(**kwargs))
+        super(Redis, self).__init__(pool_factory(**kwargs), custom_command_class=custom_command_class)
 
     def __del__(self):
         self.close()
@@ -104,6 +82,7 @@ class Redis(ModifiedRedis):
         self._connection_pool = None
 
 
+# TODO (api) add a modified_class here as well.
 class ModifiedConnection:
     def __init__(self, connection, **kwargs):
         self._connection = connection
