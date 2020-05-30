@@ -222,7 +222,7 @@ class Connection:
         self._send(*cmds)
         res = []
         found_errors = False
-        for _recv in recv:
+        for _ in cmds:
             try:
                 result = self._recv()
                 if isinstance(result, Error):

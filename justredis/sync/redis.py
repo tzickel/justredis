@@ -37,14 +37,6 @@ class ModifiedRedis:
         if args:
             raise ValueError("Please specify the connection arguments as named arguments (i.e. push=..., key=...)")
         wrapper = PushConnection if push else Connection
-        #settings = merge_dicts(self._settings, kwargs)
-        # TODO (api) should we put the **settings here too ?
-        #if settings is None:
-            #conn = self._connection_pool.connection()
-            #return wrapper(conn)
-        #else:
-            #conn = self._connection_pool.connection(**settings)
-            #return wrapper(conn, **settings)
         return wrapper(self._connection_pool.connection(**kwargs), **self._settings)
 
     def endpoints(self):

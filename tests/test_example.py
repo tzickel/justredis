@@ -22,7 +22,7 @@ def example():
 
     # Or we can just pipeline them.
     with r.connection(key="a") as c:
-        result = c({"command": ("multi", )}, ("set", "a", "b"), ("get", "a"), ("exec", ))[-1]
+        result = c(("multi", ), ("set", "a", "b"), ("get", "a"), ("exec", ))[-1]
         assert result == ["OK", "b"]
 
 
