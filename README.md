@@ -4,7 +4,7 @@ A Redis client for Python
 
 Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
 
-## Why ?
+## [Why](https://xkcd.com/927/) ?
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster api, script caching, etc...)
 - Cluster support
