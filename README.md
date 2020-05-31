@@ -9,7 +9,7 @@ Please note that this project is currently alpha quality and the API is not fina
 - Transparent API (Just call the Redis commands, and the library will figure out cluster api, script caching, etc...)
 - Cluster support
 - RESP2 & RESP3 support
-- Per context & command properties (database #, decoding, RESP3 attributes, etc...)
+- Per context & command properties (database #, decoding, RESP3 attributes)
 - Pipelining
 - Modular API allowing for support for multiple synchronous and (later) asynchronous event loops
 
@@ -21,9 +21,9 @@ Please note that this project is currently alpha quality and the API is not fina
 
 ## Not on roadmap (for now?)
 
-- Sentinal support
 - High level features which are not part of the Redis specification (such as locks, retry transactions, etc...)
 - Manual command interface (maybe for special stuff like bit operations?)
+- Sentinal support
 
 ## Installing
 
@@ -191,7 +191,7 @@ key
 push
 This can be provided to connection() or __call__():
 endpoint (False)
-
+parse_url option
 
 ### Exceptions
 

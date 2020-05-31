@@ -1,9 +1,9 @@
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qsl
 
 
-# TODO (correctness) complete all possibile options
+# TODO (api) complete all possibile options
 # TODO (correctness) do I need to url encoding escape something ?
-# TODO (misc) how to parse multiple addresses?
+# TODO (misc) the validation and conversion should be done at the other side!
 def parse_url(url):
     result = urlparse(url)
     res = {}
@@ -12,13 +12,40 @@ def parse_url(url):
         pass
     elif result.scheme == "redis-socket" or result.scheme == "unix":
         res["socket_factory"] = "unix"
+    elif result.scheme == "rediss" or result.scheme == "ssl":
+        res["socket_factory"] = "ssl"
     else:
         raise NotImplementedError("Not implmented connection scheme: %s" % result.scheme)
 
     if result.username:
-        res["username"] = result.username
-    if result.password:
-        res["password"] = result.password
+        if result.password:
+            res["username"] = result.username
+            res["password"] = result.password
+        else:
+            res["password"] = result.username
+
+    if res["socket_factory"] == "unix":
+        res["address"] = result.path
+    else:
+        addresses = result.netloc.split('@')[-1].split(',')
+        parsed_addresses = []
+        for address in addresses:
+            data = address.split(':', 1)
+            if len(data) == 1:
+                parsed_addresses.append((data[0], 6379))
+            else:
+                parsed_addresses.append((data[0], int(data[1])))
+
+        if len(parsed_addresses) == 1:
+            res["address"] = parsed_addresses[0]
+        else:
+            res["addresses"] = parsed_addresses
+
+        if result.path:
+            res["database"] = result.path[1:]
+
+    if result.query:
+        res.update(dict(parse_qsl(result.query)))
 
     return res
 
