@@ -6,12 +6,12 @@ Please note that this project is currently alpha quality and the API is not fina
 
 ## [Why](https://xkcd.com/927/) ?
 
-- Transparent API (Just call the Redis commands, and the library will figure out cluster api, script caching, etc...)
+- Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
 - Cluster support
 - RESP2 & RESP3 support
 - Per context & command properties (database #, decoding, RESP3 attributes)
 - Pipelining
-- Modular API allowing for support for multiple synchronous and (later) asynchronous event loops
+- Modular API allowing for easy support for multiple synchronous and (later) asynchronous event loops
 
 ## Roadmap
 
@@ -48,20 +48,22 @@ assert r("get", "a") == "b"
 assert r("get", "a", decoder=None) == b"b" # But this can be changed on the fly
 
 
-# We can even run commands on a different database
+# We can even run commands on a different database number
 with r.modify(database=1) as r1:
     assert r1("get", "a") == None # In this database, a was not set to b
 
 
 # Here we can use a transactional set of commands
-with r.connection(key="a") as c: # Notice we pass here a key from below (not a must if you never plan on connecting to a cluster)
+# Notice that when we take a connection, if we plan on cluster support, we need
+# to tell it a key we plan on using inside, or a specific server address
+with r.connection(key="a") as c:
     c("multi")
     c("set", "a", "b")
     c("get", "a")
     assert c("exec") == ["OK", "b"]
 
 
-# Or we can just pipeline them
+# Or we can just pipeline the commands from before
 with r.connection(key="a") as c:
     result = c(("multi", ), ("set", "a", "b"), ("get", "a"), ("exec", ))[-1]
     assert result == ["OK", "b"]
@@ -72,7 +74,7 @@ with r.connection(key="a") as c:
 while True:
     with r.connection(key="counter") as c:
         c("watch", "counter")
-        value = int(c("get", "counter") or 0)
+        value = int(c("get", "counter")) or 0
         c("multi")
         c("set", "counter", value + 1)
         if c("exec") is None: # Redis returns None in EXEC command when the transaction failed
@@ -98,16 +100,22 @@ Redis(**kwargs)
     from_url(url, **kwargs)
     __enter__() / __exit__()
     close()
+    # kwargs options = endpoint, decoder, attributes, database
     __call__(*cmd, **kwargs)
     endpoints()
+    # kwargs options = decoder, attributes, database
     modify(**kwargs) # Returns a modified settings instance (while sharing the pool)
-    connection(*args, push=False, **kwargs)
+    # kwargs options = key, endpoint, decoder, attributes, database
+    connection(push=False, **kwargs)
         __enter__() / __exit__()
         close()
+        # kwargs options = decoder, attributes, database
         __call__(*cmd, **kwargs) # On push connection no result for calls
+        # kwargs options = decoder, attributes, database
         modify(**kwargs) # Returns a modified settings instance (while sharing the connection)
 
         # Push connection only commands
+        # kwargs options = decoder, attributes
         next_message(timeout=None, **kwargs)
         __iter__()
         __next__()
@@ -115,7 +123,23 @@ Redis(**kwargs)
 
 ### Settings options
 
-This are the Redis constructor options:
+```Redis.from_url()``` options are:
+
+Regular TCP connection
+redis://[[username:]password@]host[:port][/database][[?option1=value1][&option2=value2]]
+
+SSL TCP connection (you can use ssl instead of rediss)
+rediss://[[username:]password@]host[:port][/database][[?option1=value1][&option2=value2]]
+
+Unix domain connection (you can use unix instead of redis-socket)
+redis-socket://[[username:]password@]path][[?option1=value1][&option2=value2]]
+
+For cluster, you can replace host:port with a list of host1:port1,host2:port2,... if you want fallback options for backup.
+
+You can add options in the end from the Redis constructor options below.
+
+
+This are the ```Redis()``` constructor options:
 ```
 pool_factory ("auto")
     "auto" / "cluster" - Try to figure out automatically what the Redis server type is (currently cluster / no-cluster)
@@ -166,13 +190,13 @@ database (None)
     Set which database to operate on the server, the default is 0
 ```
 
-This can be provided to the Redis constructor if you are using the cluster:
+This can be provided to the ```Redis()``` constructor if you are using the cluster:
 ```
 addresses (None) - Only relevent for cluster mode for now
     Multiple (address, port) tuples for cluster ips for fallback. The default is ((localhost, 6379), )
 ```
 
-This can be provided to the Redis constructor for tcp & ssl connections:
+This can be provided to the ```Redis()``` constructor for tcp & ssl connections:
 ```
 tcp_keepalive (None)
     How many seconds to check the TCP connection liveness, the default is disabled
@@ -180,18 +204,13 @@ tcp_nodelay (True)
     Enable or disable the TCP nodelay algorithm
 ```
 
-This can be provided to the Redis constructor for SSL connections:
+This can be provided to the ```Redis()``` constructor for SSL connections:
 ```
 ssl_context (None)
     An Python SSL context object, the default is Python's ssl.create_default_context
 ```
 
-Document this as well:
-key
-push
-This can be provided to connection() or __call__():
-endpoint (False)
-parse_url option
+Read the cluster and connection documentation below for the options for the ```connection()``` and ```__call__()``` API
 
 ### Exceptions
 
@@ -256,7 +275,9 @@ Check the [transaction or pubsub examples](#examples) above for syntax usage.
 
 You can pipeline multiple commands together by passing an list of commands to be sent together. This is usually to have better latency.
 
-(*) Document cluster support + transaction
+Notice that if you are talking to a cluster, the pipeline must contain commands which handle keys in the same keyslots in the server.
+
+If some of the commands failed, an PipelinedExceptions exception will be thrown, with it's args pointing to the result of each command.
 
 ### Cluster commands
 
