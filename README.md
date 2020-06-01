@@ -126,13 +126,19 @@ Redis(**kwargs)
 ```Redis.from_url()``` options are:
 
 Regular TCP connection
+```
 redis://[[username:]password@]host[:port][/database][[?option1=value1][&option2=value2]]
+```
 
 SSL TCP connection (you can use ssl instead of rediss)
+```
 rediss://[[username:]password@]host[:port][/database][[?option1=value1][&option2=value2]]
+```
 
 Unix domain connection (you can use unix instead of redis-socket)
+```
 redis-socket://[[username:]password@]path][[?option1=value1][&option2=value2]]
+```
 
 For cluster, you can replace host:port with a list of host1:port1,host2:port2,... if you want fallback options for backup.
 
@@ -322,6 +328,21 @@ r = Redis(attributes=True)
 If attributes is disabled, you will get the direct Python mapping of the results (set, list, dict, string, numbers, etc...) and if enabled, you will get a special object which will hold the raw data in the data attribute, and the attributes in the attrs attribute. Notice that this feature is orthogonal to choosing RESP2 / RESP3 (but in RESP2 the attrs will always be empty), for ease of development.
 
 (*) Document about the type system more ?
+
+Here is an example of the difference in Redis version 6, with and without attributes:
+```python
+>>> import justredis
+>>> r = justredis.Redis()
+>>> r("hgetall", "aaa")
+[b'bbb', b'ccc', b'ccc', b'ddd']
+>>> r("hgetall", "aaa", attributes=True)
+Array: [String: b'bbb' , String: b'ccc' , String: b'ccc' , String: b'ddd' ] 
+>>> r = justredis.Redis(resp_version=-1)
+>>> r("hgetall", "aaa")
+OrderedDict([(b'bbb', b'ccc'), (b'ccc', b'ddd')])
+>>> r("hgetall", "aaa", attributes=True)
+Map: OrderedDict([(String: b'bbb' , String: b'ccc' ), (String: b'ccc' , String: b'ddd' )])
+```
 
 ### Thread safety
 
