@@ -19,9 +19,15 @@ timeout_error = TimeoutError()
 
 
 class Connection:
+    @classmethod
+    def create(cls, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
+        ret = cls()
+        ret._init(username, password, client_name, resp_version, socket_factory, connect_retry, database, **kwargs)
+        return ret
+
     # TODO (api) client_name with connection pool (?)
     # TODO (documentation) the username/password/client_name need the decoding of whatever **kwargs is passed
-    def __init__(self, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
+    def _init(self, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
         if resp_version not in (-1, 2, 3):
             raise ValueError("Unsupported RESP protocol version %s" % resp_version)
 
@@ -145,7 +151,7 @@ class Connection:
         if decoder is not False or attributes is not None:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
-            if decode is not False:
+            if decoder is not False:
                 kwargs["decoder"] = decoder
             if attributes is not None:
                 kwargs["attributes"] = attributes

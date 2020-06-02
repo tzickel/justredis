@@ -122,8 +122,8 @@ class ThreadedEnvironment:
             def release(self):
                 self._semaphore.release()
 
-            def acquire(self, blocking=True, timeout=None):
-                self._semaphore.acquire(blocking, timeout)  # AWAIT
+            def acquire(self, timeout=None):
+                self._semaphore.acquire(True, timeout)  # AWAIT
 
         return OurSemaphore()
 

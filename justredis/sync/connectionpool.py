@@ -51,10 +51,10 @@ class ConnectionPool:
                 if self._limit is not None:
                     self._limit.release()
         except IndexError:
-            if self._limit is not None and not self._limit.acquire(True, self._wait_timeout):
+            if self._limit is not None and not self._limit.acquire(self._wait_timeout):
                 raise ConnectionPoolError("Could not acquire an connection form the pool")
             try:
-                conn = Connection(**self._connection_settings)
+                conn = Connection.create(**self._connection_settings)
             except Exception:
                 if self._limit is not None:
                     self._limit.release()
