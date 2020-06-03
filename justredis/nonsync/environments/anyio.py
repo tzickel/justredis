@@ -94,6 +94,21 @@ class SocketWrapper:
         return peername
 
 
+class OurSemaphore:
+    def __init__(self, value=None):
+        self._semaphore = anyio.create_semaphore(value)
+
+    async def release(self):
+        await self._semaphore.__aexit__(None, None, None)
+
+    async def acquire(self, timeout=None):
+        if timeout:
+            async with anyio.fail_after(timeout):
+                await self._semaphore.__aenter__()
+        else:
+            await self._semaphore.__aenter__()
+
+
 class AnyIOEnvironment:
     @staticmethod
     async def socket(socket_type="tcp", **kwargs):
@@ -109,26 +124,8 @@ class AnyIOEnvironment:
 
     @staticmethod
     def semaphore():
-        from anyio import create_semaphore
-
-        class OurSemaphore:
-            def __init__(self, value=None):
-                self._semaphore = create_semaphore(value)
-
-            async def release(self):
-                await self._semaphore.__aexit__(None, None, None)
-
-            async def acquire(self, timeout=None):
-                if timeout:
-                    async with anyio.fail_after(timeout):
-                        await self._semaphore.__aenter__()
-                else:
-                    await self._semaphore.__aenter__()
-
         return OurSemaphore()
 
     @staticmethod
     def lock():
-        from anyio import create_lock
-
-        return create_lock()
+        return anyio.create_lock()
