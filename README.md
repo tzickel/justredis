@@ -18,7 +18,7 @@ Please note that this project is currently alpha quality and the API is not fina
 | [Pub/Sub](https://redis.io/topics/pubsub) | V | See [examples](#examples) and [Pub/Sub and monitor section](#redis-command-replacements) |
 | [Pipelining](https://redis.io/topics/pipelining) | V | See [examples](#examples) and [Pipelining section](#pipelining) |
 | [Cluster](https://redis.io/topics/cluster-spec) | V | See [Cluster commands](#cluster-commands) |
-| [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 / RESP3 difference section](#resp2-/-resp3-difference) |
+| [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 and RESP3 difference section](#resp2-and-resp3-difference) |
 | [Script caching](https://redis.io/commands/evalsha) | X | Planned |
 | [Client side caching](https://redis.io/topics/client-side-caching) | X | Planned |
 | [Sentinal](https://redis.io/topics/sentinel) | X | Not a high priority, PR welcome |
@@ -313,7 +313,7 @@ r("cluster", "info", endpoint="masters")
 
 You can also open a connection (for example to get key space notifications or monitor to a specific instance by adding ```endpoint=<the server address>```) to the connection() method.
 
-### RESP2 / RESP3 difference
+### RESP2 and RESP3 difference
 
 The library supports talking both in RESP2 and RESP3. By default it will use RESP2, because this way you'll get same response whether you are talking to a RESP3 supporting server or not.
 
