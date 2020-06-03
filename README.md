@@ -7,23 +7,31 @@ Please note that this project is currently alpha quality and the API is not fina
 ## [Why](https://xkcd.com/927/) ?
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
-- Cluster support
-- RESP2 & RESP3 support
 - Per context & command properties (database #, decoding, RESP3 attributes)
-- Pipelining
 - Modular API allowing for easy support for multiple synchronous and (later) asynchronous event loops
+
+## Support table
+
+| Feature | Supported | Notes |
+| --- | --- | --- |
+| [Transactions](https://redis.io/topics/transactions) | V | See [examples](#examples) and [Transaction section](#redis-command-replacements) |
+| [Pub/Sub](https://redis.io/topics/pubsub) | V | See [examples](#examples) and [Pub/Sub and monitor section](#redis-command-replacements) |
+| [Pipelining](https://redis.io/topics/pipelining) | V | See [examples](#examples) and [Pipelining section](#pipelining) |
+| [Cluster](https://redis.io/topics/cluster-spec) | V | See [Cluster commands](#cluster-commands) |
+| [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 / RESP3 difference section](#resp2-/-resp3-difference) |
+| [Script caching](https://redis.io/commands/evalsha) | X | Planned |
+| [Client side caching](https://redis.io/topics/client-side-caching) | X | Planned |
+| [Sentinal](https://redis.io/topics/sentinel) | X | Not a high priority, PR welcome |
 
 ## Roadmap
 
-- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio and trio
-- Transparent EVAL script caching
-- Redis client-side caching
+- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio
+- More features in the support table
 
 ## Not on roadmap (for now?)
 
 - High level features which are not part of the Redis specification (such as locks, retry transactions, etc...)
 - Manual command interface (maybe for special stuff like bit operations?)
-- Sentinal support
 
 ## Installing
 
@@ -261,7 +269,7 @@ with r.modify(database=2) as r1:
 
 To use the transaction commands, you must take a connection, and use all the commands inside. Please read the [Connection section](#connection-commands) below for more details.
 
-### Pubsub and monitor (SUBSCRIBE / PSUBSCRIBE / UNSUBSCRIBE / PUNSUBSCRIBE / MONITOR)
+### Pub/Sub and monitor (SUBSCRIBE / PSUBSCRIBE / UNSUBSCRIBE / PUNSUBSCRIBE / MONITOR)
 
 To use push commands, you must take a push connection, and use all the commands inside. Please read the [Connection section](#connection-commands) below for more details.
 
