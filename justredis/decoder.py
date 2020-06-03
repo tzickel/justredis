@@ -3,7 +3,6 @@ from collections import OrderedDict
 from .errors import ProtocolError
 
 
-# TODO (api) should Exceptions be bytes, or strings with utf-8 and ignore errors (since it's just a blob)?
 # TODO (misc) We can add helpful error messages on which part the parsing failed, should we do that ?
 # TODO (misc) Should we make ProtocolError the catch all chain ?
 # TODO (misc) There is allot of code duplication here, we can merge most of it.
@@ -217,12 +216,11 @@ class RedisRespDecoder:
             elif buffer.skip_if_startswith(b"-"):
                 msg_type = Error
                 while True:
-                    # TODO (misc) decode to string as well ?
                     msg = buffer.takeline()
                     if msg is not None:
                         break
                     yield _need_more_data
-                msg = bytes(msg)
+                msg = bytes(msg).decode("utf-8", "replace")
             # Number
             elif buffer.skip_if_startswith(b":"):
                 msg_type = Number
@@ -366,7 +364,7 @@ class RedisRespDecoder:
                         yield _need_more_data
                     msg = buffer.take(length)
                     buffer.skip(2)
-                    msg = bytes(msg)
+                    msg = bytes(msg).decode("utf-8", "replace")
             # Big number
             elif buffer.skip_if_startswith(b"("):
                 msg_type = BigNumber

@@ -3,7 +3,7 @@ from urllib.parse import urlparse, parse_qsl
 
 # TODO (api) complete all possibile options
 # TODO (correctness) do I need to url encoding escape something ?
-# TODO (misc) the validation and conversion should be done at the other side!
+# TODO (misc) the validation and conversion from strings should be done at the other side
 def parse_url(url):
     result = urlparse(url)
     res = {}
@@ -27,10 +27,10 @@ def parse_url(url):
     if res["socket_factory"] == "unix":
         res["address"] = result.path
     else:
-        addresses = result.netloc.split('@')[-1].split(',')
+        addresses = result.netloc.split("@")[-1].split(",")
         parsed_addresses = []
         for address in addresses:
-            data = address.split(':', 1)
+            data = address.split(":", 1)
             if len(data) == 1:
                 parsed_addresses.append((data[0], 6379))
             else:
@@ -72,9 +72,7 @@ def get_command_name(cmd):
 
 
 def is_multiple_commands(*cmd):
-    if isinstance(cmd[0], dict) and len(cmd) > 1:
-        return True
-    elif isinstance(cmd[0], (tuple, list)):
+    if isinstance(cmd[0], (tuple, list)):
         return True
     else:
         return False

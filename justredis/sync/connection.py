@@ -68,7 +68,7 @@ class Connection:
                 connected = True
             except Error as e:
                 # This is to seperate an login error from the server not supporting RESP3
-                if e.args[0].startswith(b"ERR "):
+                if e.args[0].startswith("ERR "):
                     if resp_version == 3:
                         # TODO (misc) this want have a __cause__ is that ok ? what exception to throw here ?
                         raise Exception("Server does not support RESP3 protocol")
@@ -210,7 +210,7 @@ class Connection:
         self._send(*cmd)
         res = self._recv()
         if isinstance(res, Error):
-            if res.args[0].startswith(b"MOVED "):
+            if res.args[0].startswith("MOVED "):
                 self._seen_moved = True
             raise res
         if res == timeout_error:
@@ -232,7 +232,7 @@ class Connection:
             try:
                 result = self._recv()
                 if isinstance(result, Error):
-                    if result.args[0].startswith(b"MOVED "):
+                    if result.args[0].startswith("MOVED "):
                         self.seen_moved = True
                     found_errors = True
                 if result == timeout_error:

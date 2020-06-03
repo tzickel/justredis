@@ -34,6 +34,9 @@ def tcpsocket(address=None, connect_timeout=None, socket_timeout=None, tcp_keepa
             sock.setsockopt(socket.IPPROTO_TCP, 0x10, tcp_keepalive // 3)
         elif platform == "windows":
             sock.ioctl(socket.SIO_KEEPALIVE_VALS, (1, tcp_keepalive * 1000, tcp_keepalive // 3 * 1000))
+        else:
+            # TODO (misc) warning maybe instead ?
+            raise NotImplementedError("Unknown platform, cannot set tcp_keepalive")
     return sock
 
 
@@ -49,8 +52,8 @@ def unixsocket(address=None, connect_timeout=None, socket_timeout=None, **kwargs
     return sock
 
 
-# TODO how do cluster hostname work with SSL ?
-# TODO does closing this also close the socket itself ?
+# TODO (correctness) how do cluster hostname work with SSL ?
+# TODO (correctness) does closing this also close the socket itself ?
 def sslsocket(address=None, ssl_context=None, **kwargs):
     import ssl
 

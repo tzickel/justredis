@@ -39,7 +39,7 @@ class ModifiedRedis:
         if args:
             raise ValueError("Please specify the connection arguments as named arguments (i.e. push=..., key=...)")
         wrapper = PushConnection if push else Connection
-        return wrapper(self._connection_pool.connection(**kwargs), **self._settings)
+        return wrapper.create(self._connection_pool.connection(**kwargs), **self._settings)
 
     def endpoints(self):
         return self._connection_pool.endpoints()
@@ -114,9 +114,15 @@ class ModifiedConnection:
 
 
 class Connection(ModifiedConnection):
+    @classmethod
+    def create(cls, connection, **kwargs):
+        conn = connection.__enter__()
+        ret = cls(conn, **kwargs)
+        ret._connection_context = connection
+        return ret
+
     def __init__(self, connection, **kwargs):
-        self._connection_context = connection
-        super(Connection, self).__init__(connection.__enter__(), **kwargs)
+        super(Connection, self).__init__(connection, **kwargs)
 
     def __del__(self):
         self.close()

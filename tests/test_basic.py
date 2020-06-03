@@ -11,14 +11,14 @@ def test_auth(client_with_blah_password):
     with Redis(address=address) as r:
         with pytest.raises(Error) as exc_info:
             r("set", "auth_a", "b")
-        assert exc_info.value.args[0].startswith(b"NOAUTH")
+        assert exc_info.value.args[0].startswith("NOAUTH ")
 
     # Wrong password
     with Redis(address=address, password="nop") as r:
         with pytest.raises(Error) as exc_info:
             r("set", "auth_a", "b")
         # Changes between Redis 5 and Redis 6
-        assert exc_info.value.args[0].startswith(b"WRONGPASS") or exc_info.value.args[0].startswith(b"ERR invalid password")
+        assert exc_info.value.args[0].startswith("WRONGPASS ") or exc_info.value.args[0].startswith("ERR invalid password")
 
     # Correct password
     with Redis(address=address, password="blah") as r:
@@ -52,14 +52,14 @@ def test_modify_database_cluster(cluster_client):
         with r.modify(database=1).connection(key="a") as c:
             assert c("get", "modify_database_a_0") == None
             assert c("set", "modify_database_a_1", "a") == b"OK"
-    assert exc_info.value.args[0] == (b"ERR SELECT is not allowed in cluster mode")
+    assert exc_info.value.args[0] == ("ERR SELECT is not allowed in cluster mode")
 
 
 def test_notallowed(client):
     r = client
     with pytest.raises(Error) as exc_info:
         r("auth", "asd")
-    assert exc_info.value.args[0].startswith(b"ERR")
+    assert exc_info.value.args[0].startswith("ERR ")
 
 
 def test_some_encodings(client):
@@ -122,7 +122,7 @@ def test_multi(client):
             assert c1("exec") == [b"OK", [b"b", None]]
         assert r.modify(database=2)("get", "a") == b"b"
     except Error as e:
-        if e.args[0] == b"ERR SELECT is not allowed in cluster mode":
+        if e.args[0] == "ERR SELECT is not allowed in cluster mode":
             pass
         else:
             raise
@@ -213,4 +213,4 @@ def test_moved_cluster(cluster_client):
     result = r("get", "aa", endpoint="masters")
     result = list(result.values())
     assert b"a" in result
-    assert len([x for x in result if isinstance(x, Error) and x.args[0].startswith(b"MOVED ")]) == 2
+    assert len([x for x in result if isinstance(x, Error) and x.args[0].startswith("MOVED ")]) == 2
