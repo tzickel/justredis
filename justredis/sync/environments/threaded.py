@@ -1,3 +1,4 @@
+from threading import Lock, Semaphore
 import socket
 import sys
 
@@ -12,8 +13,6 @@ elif sys.platform.startswith("win"):
 
 
 def tcpsocket(address=None, connect_timeout=None, socket_timeout=None, tcp_keepalive=None, tcp_nodelay=True, **kwargs):
-    import socket
-
     if address is None:
         address = ("localhost", 6379)
     sock = socket.create_connection(address, connect_timeout)  # AWAIT
@@ -41,8 +40,6 @@ def tcpsocket(address=None, connect_timeout=None, socket_timeout=None, tcp_keepa
 
 
 def unixsocket(address=None, connect_timeout=None, socket_timeout=None, **kwargs):
-    import socket
-
     if address is None:
         address = "/tmp/redis.sock"
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -55,8 +52,6 @@ def unixsocket(address=None, connect_timeout=None, socket_timeout=None, **kwargs
 # TODO (correctness) how do cluster hostname work with SSL ?
 # TODO (correctness) does closing this also close the socket itself ?
 def sslsocket(address=None, ssl_context=None, **kwargs):
-    import ssl
-
     if address is None:
         address = ("localhost", 6379)
     sock = tcpsocket(address=address, **kwargs)
@@ -101,6 +96,28 @@ class SocketWrapper:
         return peername
 
 
+class OurSemaphore:
+    def __init__(self, value=None):
+        self._semaphore = Semaphore(value)
+
+    def release(self):
+        self._semaphore.release()
+
+    def acquire(self, timeout=None):
+        self._semaphore.acquire(True, timeout)  # AWAIT
+
+
+class OurLock:
+    def __init__(self):
+        self._lock = Lock()
+
+    def __enter__(self):
+        self._lock.acquire()  # AWAIT
+
+    def __exit__(self, *args):
+        self._lock.release()  # AWAIT
+
+
 class ThreadedEnvironment:
     @staticmethod
     def socket(socket_type="tcp", **kwargs):
@@ -116,32 +133,8 @@ class ThreadedEnvironment:
 
     @staticmethod
     def semaphore():
-        from threading import Semaphore
-
-        class OurSemaphore:
-            def __init__(self, value=None):
-                self._semaphore = Semaphore(value)
-
-            def release(self):
-                self._semaphore.release()
-
-            def acquire(self, timeout=None):
-                self._semaphore.acquire(True, timeout)  # AWAIT
-
         return OurSemaphore()
 
     @staticmethod
     def lock():
-        from threading import Lock
-
-        class OurLock:
-            def __init__(self):
-                self._lock = Lock()
-
-            def __enter__(self):
-                self._lock.acquire()  # AWAIT
-
-            def __exit__(self, *args):
-                self._lock.release()  # AWAIT
-
         return OurLock()

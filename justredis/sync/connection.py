@@ -25,6 +25,9 @@ class Connection:
         ret._init(username, password, client_name, resp_version, socket_factory, connect_retry, database, **kwargs)
         return ret
 
+    def __init__(self):
+        self._socket = None
+
     # TODO (api) client_name with connection pool (?)
     # TODO (documentation) the username/password/client_name need the decoding of whatever **kwargs is passed
     def _init(self, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
@@ -253,6 +256,3 @@ class Connection:
 
     def allow_multi(self, allow):
         self._allow_multi = allow
-
-    def is_valid(self):
-        self._command(b"PING")

@@ -1,8 +1,15 @@
 import pytest
-from justredis import Redis, Error
+from justredis import Redis, Error, CommunicationError
 
 
 # TODO (misc) copy all of misc/example.py into here
+
+
+def test_connection_error():
+    with pytest.raises(CommunicationError):
+        with Redis(address=('127.0.0.222', 11121)) as r:
+            r("set", "a", "b")
+
 
 
 def test_auth(client_with_blah_password):
