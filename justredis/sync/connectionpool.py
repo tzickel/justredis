@@ -36,7 +36,7 @@ class ConnectionPool:
                     connection.close()
                 self._connections_available.clear()
                 self._connections_in_use.clear()
-                self._limit = get_environment(**self.connection_settings).semaphore(max_connections) if self._max_connections else None
+                self._limit = get_environment(**self.connection_settings).semaphore(self._max_connections) if self._max_connections else None
             self._closed = True
 
     def take(self):

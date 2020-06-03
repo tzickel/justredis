@@ -95,18 +95,18 @@ class SocketWrapper:
 
 
 class OurSemaphore:
-    def __init__(self, value=None):
-        self._semaphore = anyio.create_semaphore(value)
+    def __init__(self, value):
+        self._semaphore = anyio.create_capcity_limiter(value)
 
     async def release(self):
-        await self._semaphore.__aexit__(None, None, None)
+        await self._semaphore.release()
 
     async def acquire(self, timeout=None):
         if timeout:
             async with anyio.fail_after(timeout):
-                await self._semaphore.__aenter__()
+                await self._semaphore.acquire()
         else:
-            await self._semaphore.__aenter__()
+            await self._semaphore.acquire()
 
 
 class AnyIOEnvironment:
@@ -123,8 +123,8 @@ class AnyIOEnvironment:
         return await SocketWrapper.create(socket_type, **kwargs)
 
     @staticmethod
-    def semaphore():
-        return OurSemaphore()
+    def semaphore(limit):
+        return OurSemaphore(limit)
 
     @staticmethod
     def lock():

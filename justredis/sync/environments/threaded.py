@@ -97,7 +97,7 @@ class SocketWrapper:
 
 
 class OurSemaphore:
-    def __init__(self, value=None):
+    def __init__(self, value):
         self._semaphore = Semaphore(value)
 
     def release(self):
@@ -132,8 +132,8 @@ class ThreadedEnvironment:
         return SocketWrapper(socket_type, **kwargs)
 
     @staticmethod
-    def semaphore():
-        return OurSemaphore()
+    def semaphore(limit):
+        return OurSemaphore(limit)
 
     @staticmethod
     def lock():
