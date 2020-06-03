@@ -31,7 +31,8 @@ Please note that this project is currently alpha quality and the API is not fina
 ## Not on roadmap (for now?)
 
 - High level features which are not part of the Redis specification (such as locks, retry transactions, etc...)
-- Manual command interface (maybe for special stuff like bit operations?)
+- Manual command interface (maybe for special stuff like bit operations ?)
+- Python 2 support (can be added, but after removing some misc syntax features such as chained exceptions...)
 
 ## Installing
 
