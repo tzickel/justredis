@@ -8,9 +8,10 @@ Please note that this project is currently alpha quality and the API is not fina
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
 - Per context & command properties (database #, decoding, RESP3 attributes)
-- Modular API allowing for easy support for multiple synchronous and (later) asynchronous event loops
+- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using anyio)
+- Modular API allowing for easy support for multiple synchronous and asynchronous event loops
 
-## Support table
+## Redis features support table
 
 | Feature | Supported | Notes |
 | --- | --- | --- |
@@ -25,8 +26,8 @@ Please note that this project is currently alpha quality and the API is not fina
 
 ## Roadmap
 
-- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio
 - More features in the support table
+- Better test coverage
 
 ## Not on roadmap (for now?)
 
@@ -361,7 +362,7 @@ The library is thread safe, except passing connections between threads.
 
 You can use the modify() methods both in the Redis instance, and in the commands to change parameters such as decoding, database number, check the [examples](#examples) above to see how it's done.
 
-## Extending the library with more command support
+### Extending the library with more command support
 
 You can extend the Redis object to support real redis commands, and not just calling them raw, here is an example:
 
@@ -386,3 +387,36 @@ assert r.get("hi", decoder="utf8") == "hi"
 with r.modify(database=1) as r1:
     assert r1.get("hi") == None
 ```
+
+### Async support
+
+The API for the asynchronous commands is exactly the same, just adding "await" where it's needed:
+
+```python
+AsyncRedis(**kwargs)
+    @classmethod
+    from_url(url, **kwargs)
+    async __aenter__() / __aexit__()
+    async close()
+    # kwargs options = endpoint, decoder, attributes, database
+    async __call__(*cmd, **kwargs)
+    async endpoints()
+    # kwargs options = decoder, attributes, database
+    modify(**kwargs) # Returns a modified settings instance (while sharing the pool)
+    # kwargs options = key, endpoint, decoder, attributes, database
+    async connection(push=False, **kwargs)
+        async __aenter__() / async __aexit__()
+        async close()
+        # kwargs options = decoder, attributes, database
+        async __call__(*cmd, **kwargs) # On push connection no result for calls
+        # kwargs options = decoder, attributes, database
+        modify(**kwargs) # Returns a modified settings instance (while sharing the connection)
+
+        # Push connection only commands
+        # kwargs options = decoder, attributes
+        async next_message(timeout=None, **kwargs)
+        __iter__()
+        async __next__()
+```
+
+Don't forget there is no ```__del__()``` method in async code, so call close or use async context managers when needed.
