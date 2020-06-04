@@ -23,14 +23,14 @@ class ConnectionPool:
         self._connections_in_use = set()
         self._closed = False
 
-    async def close(self):
+    async def aclose(self):
         async with self._lock:
             if not self._closed:
                 # We do this first, so if another thread calls release it won't get back to the pool
                 for connection in self._connections_available:
-                    await connection.close()
+                    await connection.aclose()
                 for connection in self._connections_in_use:
-                    await connection.close()
+                    await connection.aclose()
                 self._connections_available.clear()
                 self._connections_in_use.clear()
                 self._limit = get_environment(**self.connection_settings).semaphore(self._max_connections) if self._max_connections else None
@@ -66,7 +66,7 @@ class ConnectionPool:
             # TODO (correctness) should we release the self._limit here as well ? (or just make close forever)
             # If this fails, it's a connection from a previous cycle, don't reuse it
             except KeyError:
-                await conn.close()
+                await conn.aclose()
                 return
             if not conn.closed():
                 self._connections_available.append(conn)

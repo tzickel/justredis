@@ -16,14 +16,14 @@ class ModifiedRedis:
         self._custom_command = custom_command_class(self) if self._custom_command_class else None
         self._settings = kwargs
 
-    async def close(self):
+    async def aclose(self):
         self._connection_pool = self._settings = None
 
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *args):
-        await self.close()
+        await self.aclose()
 
     async def __call__(self, *cmd, **kwargs):
         settings = merge_dicts(self._settings, kwargs)
@@ -71,9 +71,9 @@ class Redis(ModifiedRedis):
             pool_factory = ClusterConnectionPool
         super(Redis, self).__init__(pool_factory(**kwargs), custom_command_class=custom_command_class)
 
-    async def close(self):
+    async def aclose(self):
         if self._connection_pool:
-            await self._connection_pool.close()
+            await self._connection_pool.aclose()
         self._connection_pool = None
 
 
@@ -83,14 +83,14 @@ class ModifiedConnection:
         self._connection = connection
         self._settings = kwargs
 
-    async def close(self):
+    async def aclose(self):
         self._connection = self._settings = None
 
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *args):
-        await self.close()
+        await self.aclose()
 
     async def __call__(self, *cmd, **kwargs):
         settings = merge_dicts(self._settings, kwargs)
@@ -116,7 +116,7 @@ class Connection(ModifiedConnection):
     def __init__(self, connection, **kwargs):
         super(Connection, self).__init__(connection, **kwargs)
 
-    async def close(self):
+    async def aclose(self):
         if self._connection_context:
             # TODO (correctness) is this correct?
             await self._connection_context.__aexit__(None, None, None)
@@ -126,11 +126,11 @@ class Connection(ModifiedConnection):
 
 
 class PushConnection(Connection):
-    async def close(self):
+    async def aclose(self):
         if self._connection:
             # We close the connection here, since it's both hard to reset the state of the connection, and this is usually not done / at low frequency.
-            await self._connection.close()
-        await super(PushConnection, self).close()
+            await self._connection.aclose()
+        await super(PushConnection, self).aclose()
 
     async def __call__(self, *cmd, **kwargs):
         settings = merge_dicts(self._settings, kwargs)

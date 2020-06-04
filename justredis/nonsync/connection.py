@@ -88,10 +88,10 @@ class Connection:
         if database != 0:
             await self._command((b"SELECT", database))
 
-    async def close(self):
+    async def aclose(self):
         if self._socket:
             try:
-                await self._socket.close()
+                await self._socket.aclose()
             except Exception:
                 pass
             self._socket = None
@@ -119,7 +119,7 @@ class Connection:
         except ValueError as e:
             raise
         except Exception as e:
-            await self.close()
+            await self.aclose()
             raise CommunicationError("I/O error while trying to send a command") from e
 
     # TODO (misc) should a decoding error be considered an CommunicationError ?
@@ -129,7 +129,7 @@ class Connection:
                 res = self._decoder.extract()
                 if res == need_more_data:
                     if self._seen_eof:
-                        await self.close()
+                        await self.aclose()
                         raise EOFError("Connection reached EOF")
                     else:
                         data = await self._socket.recv(timeout)
@@ -142,7 +142,7 @@ class Connection:
                     continue
                 return res
         except Exception as e:
-            await self.close()
+            await self.aclose()
             raise CommunicationError("Error while trying to read a reply") from e
 
     async def pushed_message(self, timeout=False, decoder=False, attributes=None):
@@ -214,7 +214,7 @@ class Connection:
                 self._seen_moved = True
             raise res
         if res == timeout_error:
-            await self.close()
+            await self.aclose()
             raise timeout_error
         return res
 
@@ -236,7 +236,7 @@ class Connection:
                         self.seen_moved = True
                     found_errors = True
                 if result == timeout_error:
-                    await self.close()
+                    await self.aclose()
             except Exception as e:
                 result = e
                 found_errors = True

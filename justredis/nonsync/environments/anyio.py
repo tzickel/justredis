@@ -64,7 +64,7 @@ class SocketWrapper:
         self._socket_timeout = socket_timeout
         self._socket = await socket_factory(**kwargs)
 
-    async def close(self):
+    async def aclose(self):
         await self._socket.close()
 
     async def send(self, data):

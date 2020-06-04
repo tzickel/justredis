@@ -52,11 +52,11 @@ class ClusterConnectionPool:
         self._command_cache = {}
         self._closed = False
 
-    async def close(self):
+    async def aclose(self):
         async with self._lock:
             if not self._closed:
                 for pool in self._connections.values():
-                    await pool.close()
+                    await pool.aclose()
                 self._connections.clear()
                 self._last_connection = None
             self._closed = True
@@ -95,7 +95,7 @@ class ClusterConnectionPool:
             new_connections = set([x[1] for x in slots])
             connections_to_remove = previous_connections - new_connections
             for address in connections_to_remove:
-                await self._connections[address].close()
+                await self._connections[address].aclose()
                 del self._connections[address]
             self._slots = slots
 
@@ -241,7 +241,7 @@ class ClusterConnectionPool:
             pool = self._last_connection
         # The connection might have been discharged
         if pool is None:
-            await conn.close()
+            await conn.aclose()
             return
         await pool.release(conn)
 

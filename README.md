@@ -397,7 +397,7 @@ AsyncRedis(**kwargs)
     @classmethod
     from_url(url, **kwargs)
     async __aenter__() / __aexit__()
-    async close()
+    async aclose()
     # kwargs options = endpoint, decoder, attributes, database
     async __call__(*cmd, **kwargs)
     async endpoints()
@@ -406,7 +406,7 @@ AsyncRedis(**kwargs)
     # kwargs options = key, endpoint, decoder, attributes, database
     async connection(push=False, **kwargs)
         async __aenter__() / async __aexit__()
-        async close()
+        async aclose()
         # kwargs options = decoder, attributes, database
         async __call__(*cmd, **kwargs) # On push connection no result for calls
         # kwargs options = decoder, attributes, database
@@ -419,4 +419,4 @@ AsyncRedis(**kwargs)
         async __next__()
 ```
 
-Don't forget there is no ```__del__()``` method in async code, so call close or use async context managers when needed.
+Don't forget there is no ```__del__()``` method in async code, so call ```aclose()``` or use async context managers when needed.
