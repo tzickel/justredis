@@ -373,6 +373,7 @@ class RedisRespDecoder:
                     if msg is not None:
                         break
                     yield _need_more_data
+                msg = int(msg)
             # Map
             elif buffer.skip_if_startswith(b"%"):
                 while True:
@@ -448,7 +449,7 @@ class RedisRespDecoder:
             if self._attributes:
                 msg = msg_type(msg, last_attribute)
             # We still enforce this types, because of ambiguity with other types
-            elif msg_type in (Error, BigNumber):
+            elif msg_type == Error:
                 msg = msg_type(msg)
 
             last_attribute = None

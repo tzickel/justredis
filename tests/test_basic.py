@@ -11,7 +11,6 @@ def test_connection_error():
             r("set", "a", "b")
 
 
-
 def test_auth(client_with_blah_password):
     address = client_with_blah_password.endpoints()[0][0]
     # No password
