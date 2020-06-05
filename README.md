@@ -8,7 +8,7 @@ Please note that this project is currently alpha quality and the API is not fina
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
 - Per context and command properties (database #, decoding, RESP3 attributes)
-- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [anyio](https://github.com/agronholm/anyio))
+- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [AnyIO](https://github.com/agronholm/anyio))
 - Modular API allowing for easy support for multiple synchronous and asynchronous event loops and disabling of unneeded features
 
 ## Redis features support table
@@ -26,8 +26,15 @@ Please note that this project is currently alpha quality and the API is not fina
 
 ## Roadmap
 
+Getting it out of alpha:
+- [ ] API Finalization
+- [ ] Support Python 3.5+
+- [ ] Resolving some of the TODO in code
+
+General:
 - More features in the support table
 - Better test coverage
+- Resolve all TODO in code
 
 ## Not on roadmap (for now?)
 
