@@ -55,6 +55,7 @@ class Connection:
         self._seen_eof = False
         self._peername = self._socket.peername()
         self._seen_moved = False
+        self._seen_ask = False
         self._allow_multi = False
         self._default_database = self._last_database = database
 
@@ -154,11 +155,10 @@ class Connection:
 
     def pushed_message(self, timeout=False, decoder=False, attributes=None):
         orig_decoder = None
-        # TODO (correctness) != or is not
-        if decoder is not False or attributes is not None:
+        if decoder != False or attributes is not None:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
-            if decoder is not False:
+            if decoder != False:
                 kwargs["decoder"] = decoder
             if attributes is not None:
                 kwargs["attributes"] = attributes
@@ -185,15 +185,14 @@ class Connection:
                 self._command(b"SELECT", database)
                 self._last_database = database
 
-    def __call__(self, *cmd, decoder=False, attributes=None, database=None):
+    def __call__(self, *cmd, decoder=False, attributes=None, database=None, asking=False):
         if not cmd:
             raise ValueError("No command provided")
         orig_decoder = None
-        # TODO (correctness) != or is not
-        if decoder is not False or attributes is not None:
+        if decoder != False or attributes is not None:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
-            if decoder is not False:
+            if decoder != False:
                 kwargs["decoder"] = decoder
             if attributes is not None:
                 kwargs["attributes"] = attributes
@@ -203,6 +202,8 @@ class Connection:
             if is_multiple_commands(*cmd):
                 return self._commands(*cmd)
             else:
+                if asking:
+                    self._command(b"ASKING")
                 return self._command(*cmd)
         finally:
             if orig_decoder is not None:
@@ -219,6 +220,9 @@ class Connection:
         if isinstance(res, Error):
             if res.args[0].startswith("MOVED "):
                 self._seen_moved = True
+            if res.args[0].startswith("ASK "):
+                _, _, address =  res.args[0].split(' ')
+                self._seen_ask = address
             raise res
         if res == timeout_error:
             self.close()
@@ -256,6 +260,13 @@ class Connection:
         if self._seen_moved:
             self._seen_moved = False
             return True
+        return False
+
+    def seen_asked(self):
+        if self._seen_ask:
+            ret = self._seen_ask
+            self._seen_ask = False
+            return ret
         return False
 
     def allow_multi(self, allow):

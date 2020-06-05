@@ -1,6 +1,7 @@
 from threading import Lock, Semaphore
 import socket
 import sys
+import ssl
 
 
 platform = ""
@@ -49,14 +50,20 @@ def unixsocket(address=None, connect_timeout=None, socket_timeout=None, **kwargs
     return sock
 
 
-# TODO (correctness) how do cluster hostname work with SSL ?
-# TODO (correctness) does closing this also close the socket itself ?
+# TODO (misc) should we enable server hostname enforcment ? give it as an option ? what about cluster ?
 def sslsocket(address=None, ssl_context=None, **kwargs):
     if address is None:
         address = ("localhost", 6379)
     sock = tcpsocket(address=address, **kwargs)
     if ssl_context is None:
-        ssl_context = ssl.create_default_context()
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        cafile = kwargs.get("ssl_cafile")
+        if cafile:
+            ssl_context.load_verify_locations(cafile)
+        certfile = kwargs.get("ssl_certfile")
+        keyfile = kwargs.get("ssl_keyfile")
+        if certfile:
+            ssl_context.load_cert_chain(certfile, keyfile)
     return ssl_context.wrap_socket(sock, server_hostname=address[0])
 
 
@@ -74,7 +81,7 @@ class SocketWrapper:
 
     # If you override this, make sure to return an empty bytes for EOF and a None for timeout !
     def recv(self, timeout=False):
-        if timeout is not False:
+        if timeout != False:
             old_timeout = self._socket.gettimeout()
             self._socket.settimeout(timeout)
             try:

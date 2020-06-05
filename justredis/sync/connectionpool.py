@@ -42,7 +42,7 @@ class ConnectionPool:
     def take(self):
         if self._closed:
             raise ConnectionPoolError("Pool already closed")
-        # TODO (correctness) cluster depends on this failing if closed !
+        # TODO (correctness) cluster depends on this failing if closed ! guess we should add a health check
         try:
             while True:
                 conn = self._connections_available.popleft()

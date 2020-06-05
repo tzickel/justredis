@@ -4,8 +4,6 @@ A Redis client for Python
 
 Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
 
-Please note that because this library supports both synchronous and asynchronous communications, if you want to use asynchronous I/O install the anyio library as well.
-
 ## [Why](https://xkcd.com/927/) ?
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
@@ -22,6 +20,7 @@ Please note that because this library supports both synchronous and asynchronous
 | [Pipelining](https://redis.io/topics/pipelining) | V | See [examples](#examples) and [Pipelining section](#pipelining) |
 | [Cluster](https://redis.io/topics/cluster-spec) | V | See [Cluster commands](#cluster-commands) |
 | [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 and RESP3 difference section](#resp2-and-resp3-difference) |
+| [SSL](https://redis.io/topics/encryption) | V | See the [ssl connection parameters](#settings-options) |
 | [Script caching](https://redis.io/commands/evalsha) | X | Planned |
 | [Client side caching](https://redis.io/topics/client-side-caching) | X | Planned |
 | [Sentinal](https://redis.io/topics/sentinel) | X | Not a high priority, PR welcome |
@@ -53,6 +52,8 @@ git+git://github.com/tzickel/justredis@master#egg=justredis
 ```
 
 Replace master with the specific branch or version tag you want.
+
+If you want to use asynchronous I/O frameworks asyncio or trio or curio with this library, you need to install the anyio library as well.
 
 ## Examples
 
@@ -236,7 +237,13 @@ tcp_nodelay (True)
 This can be provided to the ```Redis()``` constructor for ssl socket_factory:
 ```
 ssl_context (None)
-    An Python SSL context object, the default is Python's ssl.create_default_context
+    An Python SSL context object, the default is Python's ssl.create_default_context()
+ssl_cafile (None)
+    A path to the CA certificate file on disk, works only if ssl_context is None
+ssl_certfile (None)
+    A path to the server certificate file on disk, works only if ssl_context is None
+ssl_keyfile (None)
+    A path to the server key file on disk, works only if ssl_context is None
 ```
 
 Read the cluster and connection documentation below for the options for the ```connection()``` and ```__call__()``` API

@@ -187,7 +187,7 @@ def test_server_no_cluster(no_cluster_client):
 
 def test_server_cluster(cluster_client):
     r = cluster_client
-    # TODO split keys to 3 comps
+    # TODO (misc) split keys to 3 comps
     r("set", "cluster_aa", "a") == b"OK"
     r("set", "cluster_bb", "b") == b"OK"
     r("set", "cluster_cc", "c") == b"OK"

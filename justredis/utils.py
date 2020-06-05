@@ -1,7 +1,6 @@
 from urllib.parse import urlparse, parse_qsl
 
 
-# TODO (api) complete all possibile options
 # TODO (correctness) do I need to url encoding escape something ?
 # TODO (misc) the validation and conversion from strings should be done at the other side
 def parse_url(url):
