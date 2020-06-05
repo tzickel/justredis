@@ -31,6 +31,10 @@ class Connection:
     # TODO (api) client_name with connection pool (?)
     # TODO (documentation) the username/password/client_name need the decoding of whatever **kwargs is passed
     def _init(self, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
+        resp_version = int(resp_version)
+        connect_retry = int(connect_retry)
+        database = int(database)
+
         if resp_version not in (-1, 2, 3):
             raise ValueError("Unsupported RESP protocol version %s" % resp_version)
 
@@ -86,7 +90,7 @@ class Connection:
             if client_name:
                 self._command(b"CLIENT", b"SETNAME", client_name)
         if database != 0:
-            self._command((b"SELECT", database))
+            self._command(b"SELECT", database)
 
     def __del__(self):
         self.close()

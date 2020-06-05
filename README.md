@@ -4,11 +4,13 @@ A Redis client for Python
 
 Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
 
+Please note that because this library supports both synchronous and asynchronous communications, if you want to use asynchronous I/O install the anyio library as well.
+
 ## [Why](https://xkcd.com/927/) ?
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
 - Per context and command properties (database #, decoding, RESP3 attributes)
-- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [AnyIO](https://github.com/agronholm/anyio))
+- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [AnyIO](https://github.com/agronholm/anyio) which needs to be installed as well if you want async I/O)
 - Modular API allowing for easy support for multiple synchronous and asynchronous event loops and disabling of unneeded features
 
 ## Redis features support table

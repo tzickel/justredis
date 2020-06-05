@@ -4,12 +4,12 @@ from .decoder import Error
 from .errors import *
 
 
-__all__ = ["Redis", "RedisError", "CommunicationError", "ConnectionPoolError", "ProtocolError", "PipelinedExceptions", "Error"]
-
-
 try:
     from .nonsync.redis import Redis as AsyncRedis
-    __all__.append("AsyncRedis")
 except ImportError:
-    # TODO (misc) emit a warning ?
-    pass
+    class AsyncRedis:
+        def __init__(self, *args, **kwargs):
+            raise Exception("Using JustRedis asynchronously requires the anyio library to be installed")
+
+
+__all__ = "AsyncRedis", "Redis", "RedisError", "CommunicationError", "ConnectionPoolError", "ProtocolError", "PipelinedExceptions", "Error"
