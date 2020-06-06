@@ -30,8 +30,8 @@ def parse_url(url):
         parsed_addresses = []
         for address in addresses:
             data = address.split(":", 1)
-            if data[0] == '':
-                data[0] = 'localhost'
+            if data[0] == "":
+                data[0] = "localhost"
             if len(data) == 1:
                 parsed_addresses.append((data[0], 6379))
             else:
@@ -42,7 +42,7 @@ def parse_url(url):
         else:
             res["addresses"] = parsed_addresses
 
-        if result.path and result.path != '/':
+        if result.path and result.path != "/":
             res["database"] = result.path[1:]
 
     if result.query:

@@ -221,7 +221,7 @@ class Connection:
             if res.args[0].startswith("MOVED "):
                 self._seen_moved = True
             if res.args[0].startswith("ASK "):
-                _, _, address =  res.args[0].split(' ')
+                _, _, address = res.args[0].split(" ")
                 self._seen_ask = address
             raise res
         if res == timeout_error:

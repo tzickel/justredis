@@ -1,0 +1,22 @@
+FROM quay.io/pypa/manylinux2014_x86_64
+
+RUN cd /tmp && curl -s http://download.redis.io/releases/redis-5.0.8.tar.gz -O && tar -xvzof redis-5.0.8.tar.gz > /dev/null 2>&1 && cd redis-5.0.8 && make > /dev/null 2>&1
+RUN cd /tmp && curl -s http://download.redis.io/releases/redis-6.0.4.tar.gz -O && tar -xvzof redis-6.0.4.tar.gz > /dev/null 2>&1 && cd redis-6.0.4 && make > /dev/null 2>&1
+
+WORKDIR /opt
+
+ADD https://api.github.com/repos/tzickel/justredis/git/refs/heads/master version.json
+
+RUN git clone https://github.com/tzickel/justredis
+
+WORKDIR /opt/justredis
+
+#ADD . .
+
+RUN /opt/python/cp38-cp38/bin/pip install tox
+RUN REDIS_6_PATH=/tmp/redis-6.0.4/src REDIS_5_PATH=/tmp/redis-5.0.8/src PATH=/opt/python/cp38-cp38/bin:/opt/python/cp37-cp37m/bin:/opt/python/cp36-cp36m/bin:/opt/python/cp35-cp35m/bin /opt/python/cp38-cp38/bin/tox
+#RUN /opt/python/cp38-cp38/bin/python setup.py test
+#RUN /opt/python/cp37-cp37m/bin/python setup.py test
+#RUN /opt/python/cp36-cp36m/bin/python setup.py test
+#RUN /opt/python/cp35-cp35m/bin/python setup.py test
+

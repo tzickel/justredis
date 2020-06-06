@@ -278,7 +278,6 @@ class ClusterConnectionPool:
                 if endpoint == False and not is_multiple_commands(*cmd):
                     return self(*cmd, **kwargs, endpoint=seen_asked, asking=True)
 
-
     @contextmanager
     def connection(self, key=None, endpoint=None, **kwargs):
         if key and endpoint:
@@ -309,7 +308,6 @@ class ClusterConnectionPool:
                 self.release(conn)
                 if seen_moved:
                     self._update_slots()
-
 
     def _on_all(self, *cmd, filter="master", **kwargs):
         if self._clustered is None:

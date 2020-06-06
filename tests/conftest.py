@@ -1,4 +1,6 @@
 import pytest
+import os
+
 
 try:
     import anyio
@@ -19,15 +21,14 @@ from justredis import Redis
 
 
 def get_runtime_params_for_redis(dockerimage="redis"):
-    if False:
-        return {"dockerimage": dockerimage}
+    redis_6_path = os.getenv("REDIS_6_PATH")
+    redis_5_path = os.getenv("REDIS_5_PATH")
+    if dockerimage in ("redis", "redis:6") and redis_6_path:
+        return {"extrapath": redis_6_path}
+    elif dockerimage == "redis:5" and redis_5_path:
+        return {"extrapath": os.getenv("REDIS_5_PATH")}
     else:
-        if dockerimage in ("redis", "redis:6"):
-            return {"extrapath": os.getenv("REDIS_6_PATH") or "../../redis-6.0.4/src"}
-        elif dockerimage == "redis:5":
-            return {"extrapath": os.getenv("REDIS_5_PATH") or "../../redis-5.0.8/src"}
-        else:
-            raise Exception("Unknown redis version")
+        return {"dockerimage": dockerimage}
 
 
 def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
