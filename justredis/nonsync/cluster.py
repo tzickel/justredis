@@ -21,7 +21,7 @@ def calc_hashslot(key):
 
 # TODO (correctness) I think I covered the multithreading sensetive parts, make sure
 # TODO (misc) should I lazely check if there is a cluster ? (i.e. upgrade from a default connectionpool first)
-# TODO (correctness) add ASKING
+# TODO (correctness) thinkg about how to ASK redirect in connection taking and pipelining
 # TODO (correctness) make sure I dont have an issue where if there is a connection pool limit, I can get into a deadlock here
 # TODO (misc) future optimization, if we can't take from last_connection beacuse of connection pool limit, choose another random one.
 # TODO (correctness) disable encoding on all of conn commands
@@ -63,7 +63,7 @@ class ClusterConnectionPool:
 
     async def _update_slots(self):
         # TODO (misc) or if there is a hint from MOVED, recheck if clustered?
-        if self._clustered is False:
+        if self._clustered == False:
             return
         conn = await self.take()
         try:
@@ -263,6 +263,7 @@ class ClusterConnectionPool:
             raise
         finally:
             seen_moved = conn.seen_moved()
+            seen_asked = conn.seen_asked()
             await self.release(conn)
             if seen_moved:
                 await self._update_slots()
@@ -270,6 +271,9 @@ class ClusterConnectionPool:
                 # Also if ths cmd is multiple commands, we won't know which one failed and which didn't, so we don't try as well.
                 if endpoint == False and not is_multiple_commands(*cmd):
                     return await self(*cmd, **kwargs)
+            elif seen_asked:
+                if endpoint == False and not is_multiple_commands(*cmd):
+                    return await self(*cmd, **kwargs, endpoint=seen_asked, asking=True)
 
     @asynccontextmanager
     async def connection(self, key=None, endpoint=None, **kwargs):

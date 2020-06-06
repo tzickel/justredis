@@ -86,7 +86,7 @@ class Connection:
             if client_name:
                 await self._command(b"CLIENT", b"SETNAME", client_name)
         if database != 0:
-            await self._command((b"SELECT", database))
+            await self._command(b"SELECT", database)
 
     async def aclose(self):
         if self._socket:
@@ -147,11 +147,10 @@ class Connection:
 
     async def pushed_message(self, timeout=False, decoder=False, attributes=None):
         orig_decoder = None
-        # TODO (correctness) != or is not
-        if decoder is not False or attributes is not None:
+        if decoder != False or attributes is not None:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
-            if decoder is not False:
+            if decoder != False:
                 kwargs["decoder"] = decoder
             if attributes is not None:
                 kwargs["attributes"] = attributes
@@ -182,11 +181,10 @@ class Connection:
         if not cmd:
             raise ValueError("No command provided")
         orig_decoder = None
-        # TODO (correctness) != or is not
-        if decoder is not False or attributes is not None:
+        if decoder != False or attributes is not None:
             orig_decoder = self._decoder
             kwargs = self._settings.copy()
-            if decoder is not False:
+            if decoder != False:
                 kwargs["decoder"] = decoder
             if attributes is not None:
                 kwargs["attributes"] = attributes

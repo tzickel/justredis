@@ -56,7 +56,7 @@ def sslsocket(address=None, ssl_context=None, **kwargs):
         address = ("localhost", 6379)
     sock = tcpsocket(address=address, **kwargs)
     if ssl_context is None:
-        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         cafile = kwargs.get("ssl_cafile")
         if cafile:
             ssl_context.load_verify_locations(cafile)

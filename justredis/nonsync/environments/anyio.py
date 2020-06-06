@@ -1,6 +1,7 @@
 import anyio
 import socket
 import sys
+import ssl
 
 
 platform = ""
@@ -43,12 +44,19 @@ async def unixsocket(address=None, connect_timeout=None, **kwargs):
     return sock
 
 
-# TODO how do cluster hostname work with SSL ?
-# TODO does closing this also close the socket itself ?
+# TODO (misc) should we enable server hostname enforcment ? give it as an option ? what about cluster ?
 async def sslsocket(address=None, ssl_context=None, **kwargs):
     if address is None:
         address = ("localhost", 6379)
-    # TODO (correctness) kinda dangerous, check out kwargs maybe ?
+    if ssl_context is None:
+        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        cafile = kwargs.get("ssl_cafile")
+        if cafile:
+            ssl_context.load_verify_locations(cafile)
+        certfile = kwargs.get("ssl_certfile")
+        keyfile = kwargs.get("ssl_keyfile")
+        if certfile:
+            ssl_context.load_cert_chain(certfile, keyfile)
     return await tcpsocket(ssl_context=ssl_context, autostart_tls=True, **kwargs)
 
 
