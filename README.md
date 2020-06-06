@@ -2,6 +2,8 @@
 
 A Redis client for Python
 
+The regular synchronous version works on Python 3.5+, the asynchronous version requires Python 3.6+.
+
 Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
 
 ## [Why](https://xkcd.com/927/) ?
@@ -29,7 +31,6 @@ Please note that this project is currently alpha quality and the API is not fina
 
 Getting it out of alpha:
 - [ ] API Finalization
-- [ ] Support Python 3.5+
 - [ ] Resolving some of the TODO in code
 
 General:

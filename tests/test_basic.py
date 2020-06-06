@@ -7,7 +7,7 @@ from justredis import Redis, Error, CommunicationError
 
 def test_connection_error():
     with pytest.raises(CommunicationError):
-        with Redis(address=('127.0.0.222', 11121)) as r:
+        with Redis(address=("127.0.0.222", 11121)) as r:
             r("set", "a", "b")
 
 

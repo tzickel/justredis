@@ -15,32 +15,38 @@ elif sys.platform.startswith("win"):
 
 
 # TODO (misc) make this a contextmanager to cleanup properly on failures
-def start_cluster(masters, dockerimage=None, extraparams="", ipv4=True):
+def start_cluster(masters, dockerimage=None, extraparams="", extrapath="", ipv4=True):
     addr = "127.0.0.1" if ipv4 else "::1"
     ret = []
     if dockerimage is None:
         subprocess.call("rm /tmp/justredis_cluster*.conf", shell=True)
     for x in range(masters):
-        ret.append(RedisServer(dockerimage=dockerimage, extraparams="--cluster-enabled yes --cluster-config-file /tmp/justredis_cluster%d.conf" % x))
+        ret.append(RedisServer(dockerimage=dockerimage, extraparams="--cluster-enabled yes --cluster-config-file /tmp/justredis_cluster%d.conf" % x, extrapath=extrapath))
     # Requires redis-cli from version 5 for cluster management support
-    if dockerimage:
-        stdout = subprocess.Popen(
-            "docker run -i --rm --net=host " + dockerimage + " redis-cli --cluster create " + " ".join(["%s:%d" % (addr, server.port) for server in ret]),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            shell=True,
-        ).communicate(b"yes\n")
-    else:
-        stdout = subprocess.Popen("redis-cli --cluster create " + " ".join(["%s:%d" % (addr, server.port) for server in ret]), stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True).communicate(
-            b"yes\n"
-        )
+    orig_path = os.getenv("PATH")
+    try:
+        if extrapath:
+            os.putenv("PATH", os.pathsep.join((os.getenv("PATH"), extrapath)))
+        if dockerimage:
+            stdout = subprocess.Popen(
+                "docker run -i --rm --net=host " + dockerimage + " redis-cli --cluster create " + " ".join(["%s:%d" % (addr, server.port) for server in ret]),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                shell=True,
+            ).communicate(b"yes\n")
+        else:
+            stdout = subprocess.Popen(
+                "redis-cli --cluster create " + " ".join(["%s:%d" % (addr, server.port) for server in ret]), stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
+            ).communicate(b"yes\n")
+    finally:
+        os.putenv("PATH", orig_path)
     if stdout[0] == b"":
         raise Exception("Empty output from redis-cli ?")
     return ret, stdout[0]
 
 
 class RedisServer(object):
-    def __init__(self, dockerimage=None, extraparams=""):
+    def __init__(self, dockerimage=None, extraparams="", extrapath=""):
         self._proc = None
         while True:
             self.close()
@@ -53,7 +59,13 @@ class RedisServer(object):
             kwargs = {}
             if platform == "linux":
                 kwargs["preexec_fn"] = os.setsid
-            self._proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
+            orig_path = os.getenv("PATH")
+            try:
+                if extrapath:
+                    os.putenv("PATH", os.pathsep.join((os.getenv("PATH"), extrapath)))
+                self._proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
+            finally:
+                os.putenv("PATH", orig_path)
             seen_redis = False
             while True:
                 line = self._proc.stdout.readline()

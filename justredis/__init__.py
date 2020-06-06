@@ -13,7 +13,7 @@ except ImportError:
 except SyntaxError:
     class AsyncRedis:
         def __init__(self, *args, **kwargs):
-            raise Exception("Your python version is too old, and is not supported for async I/O using JustRedis")
+            raise Exception("Asynchronous I/O requires Python 3.6 or above")
 
 
 __all__ = "AsyncRedis", "Redis", "RedisError", "CommunicationError", "ConnectionPoolError", "ProtocolError", "PipelinedExceptions", "Error"
