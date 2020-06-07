@@ -1,0 +1,21 @@
+name: Docker Image CI
+
+on: [push]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build the testing Docker image
+      run: docker build . --file Dockerfile.test --network host
+  mac:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checking via homebrew
+      run: |
+        CI=1 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" > /dev/null 2>&1
+        brew install python > /dev/null 2>&1
+        python3 -m pip install tox
+        python3 -m tox -e py37

@@ -5,7 +5,7 @@ RUN cd /tmp && curl -s http://download.redis.io/releases/redis-6.0.4.tar.gz -O &
 
 WORKDIR /opt
 
-ADD https://api.github.com/repos/tzickel/justredis/git/refs/heads/master version.json
+#ADD https://api.github.com/repos/tzickel/justredis/git/refs/heads/master version.json
 
 #RUN git clone https://github.com/tzickel/justredis
 
