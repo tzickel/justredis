@@ -27,8 +27,10 @@ def get_runtime_params_for_redis(dockerimage="redis"):
         return {"extrapath": redis_6_path}
     elif dockerimage == "redis:5" and redis_5_path:
         return {"extrapath": os.getenv("REDIS_5_PATH")}
-    else:
+    elif os.getenv("REDIS_USE_DOCKER"):
         return {"dockerimage": dockerimage}
+    else:
+        return {}
 
 
 def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
