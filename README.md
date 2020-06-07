@@ -4,8 +4,6 @@ A Redis client for Python
 
 The regular synchronous version works on Python 3.5+, the asynchronous version requires Python 3.6+.
 
-Please note that this project is currently alpha quality and the API is not finalized. Please provide feedback if you think the API is convenient enough or not. A permissive license will be chosen once the API will be more mature for wide spread consumption.
-
 ## [Why](https://xkcd.com/927/) ?
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
@@ -22,16 +20,18 @@ Please note that this project is currently alpha quality and the API is not fina
 | [Pipelining](https://redis.io/topics/pipelining) | V | See [examples](#examples) and [Pipelining section](#pipelining) |
 | [Cluster](https://redis.io/topics/cluster-spec) | V | See [Cluster commands](#cluster-commands) |
 | [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 and RESP3 difference section](#resp2-and-resp3-difference) |
-| [SSL](https://redis.io/topics/encryption) | V | See the [ssl connection parameters](#settings-options) |
+| [SSL](https://redis.io/topics/encryption) | V | See the [SSL connection parameters](#settings-options) |
 | [Script caching](https://redis.io/commands/evalsha) | X | Planned |
 | [Client side caching](https://redis.io/topics/client-side-caching) | X | Planned |
-| [Sentinal](https://redis.io/topics/sentinel) | X | Not a high priority, PR welcome |
+| [Sentinal](https://redis.io/topics/sentinel) | X | Not a high priority |
 
 ## Roadmap
 
 Getting it out of alpha:
-- [ ] API Finalization
+- [ ] API Finalization (your feedback is appreciated)
+- [ ] Permissive license (MIT?)
 - [ ] Resolving some of the TODO in code
+- [ ] Async code test parity with regular version
 
 General:
 - More features in the support table
