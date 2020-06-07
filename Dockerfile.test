@@ -7,11 +7,11 @@ WORKDIR /opt
 
 ADD https://api.github.com/repos/tzickel/justredis/git/refs/heads/master version.json
 
-RUN git clone https://github.com/tzickel/justredis
+#RUN git clone https://github.com/tzickel/justredis
 
 WORKDIR /opt/justredis
 
-#ADD . .
+ADD . .
 
 RUN /opt/python/cp38-cp38/bin/pip install tox
 RUN REDIS_6_PATH=/tmp/redis-6.0.4/src REDIS_5_PATH=/tmp/redis-5.0.8/src PATH=/opt/python/cp38-cp38/bin:/opt/python/cp37-cp37m/bin:/opt/python/cp36-cp36m/bin:/opt/python/cp35-cp35m/bin /opt/python/cp38-cp38/bin/tox

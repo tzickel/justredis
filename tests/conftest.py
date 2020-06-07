@@ -59,6 +59,8 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
                 result = r(b"CLUSTER", b"INFO", endpoint="masters")
                 ready = True
                 for res in result.values():
+                    if isinstance(res, Exception):
+                        raise res
                     if b"cluster_state:ok" not in res:
                         ready = False
                         break
