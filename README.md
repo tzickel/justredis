@@ -1,8 +1,6 @@
 ## What ?
 
-A Redis client for Python
-
-The regular synchronous version works on Python 3.5+, the asynchronous version requires Python 3.6+.
+A Redis client for Python supporting both latest Redis features and Python synchronous (Python 3.5+) and asynchronous (Python 3.6+) communication.
 
 ## [Why](https://xkcd.com/927/) ?
 
@@ -29,7 +27,9 @@ The regular synchronous version works on Python 3.5+, the asynchronous version r
 
 Getting it out of alpha:
 - [ ] API Finalization (your feedback is appreciated)
-- [ ] Permissive license (MIT?)
+  - [ ] Should calling redis be using __call__() or a special method such as "command" for refactoring ?
+  - [ ] Is the modify() API flexiable enough ?
+  - [ ] Is it easy to extend the module
 - [ ] Resolving some of the TODO in code
 - [ ] Async code test parity with regular version
 

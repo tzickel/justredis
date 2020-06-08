@@ -51,6 +51,7 @@ class Connection:
         self._seen_eof = False
         self._peername = self._socket.peername()
         self._seen_moved = False
+        self._seen_ask = False
         self._allow_multi = False
         self._default_database = self._last_database = database
 
@@ -210,6 +211,9 @@ class Connection:
         if isinstance(res, Error):
             if res.args[0].startswith("MOVED "):
                 self._seen_moved = True
+            if res.args[0].startswith("ASK "):
+                _, _, address = res.args[0].split(" ")
+                self._seen_ask = address
             raise res
         if res == timeout_error:
             await self.aclose()
@@ -247,6 +251,13 @@ class Connection:
         if self._seen_moved:
             self._seen_moved = False
             return True
+        return False
+
+    def seen_asked(self):
+        if self._seen_ask:
+            ret = self._seen_ask
+            self._seen_ask = False
+            return ret
         return False
 
     def allow_multi(self, allow):
