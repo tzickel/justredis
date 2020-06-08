@@ -14,7 +14,7 @@ elif sys.platform.startswith("win"):
     platform = "windows"
 
 
-# TODO (misc) make this a contextmanager to cleanup properly on failures
+# TODO (misc) make this a contextmanager to cleanup properly on failures (altough currently the caller handles this)
 def start_cluster(masters, dockerimage=None, extraparams="", extrapath="", ipv4=True):
     addr = "127.0.0.1" if ipv4 else "::1"
     ret = []

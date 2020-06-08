@@ -27,9 +27,10 @@ A Redis client for Python supporting both latest Redis features and Python synch
 
 Getting it out of alpha:
 - [ ] API Finalization (your feedback is appreciated)
-  - [ ] Should calling redis be using __call__() or a special method such as "command" for refactoring ?
+  - [ ] Should calling redis be using \_\_call__() or a special method such as "command" for refactoring ?
   - [ ] Is the modify() API flexiable enough ?
   - [ ] Is it easy to extend the module
+  - [ ] Should we add helper functions for SCAN iterators and other API ?
 - [ ] Resolving some of the TODO in code
 - [ ] Async code test parity with regular version
 

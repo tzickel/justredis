@@ -1,5 +1,8 @@
 *.pyc
-venv
-.vscode
+/venv*/
+/.vscode/
 .coverage
-justredis.egg-info/
+/*.egg-info/
+/.tox/
+/htmlcov/
+/dist/
