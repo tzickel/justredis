@@ -37,7 +37,7 @@ def get_runtime_params_for_redis(dockerimage="redis"):
 
 
 def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
-    import redis_server
+    from . import redis_server
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
@@ -50,7 +50,7 @@ def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
 
 
 def redis_cluster_with_client(dockerimage="redis", extraparams=""):
-    import redis_server
+    from . import redis_server
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
