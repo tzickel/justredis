@@ -24,7 +24,7 @@ async def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
-    instance = redis_server.RedisServer(dockerimage=dockerimage, extraparams=extraparams)
+    instance = redis_server.RedisServer(extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
     async with AsyncRedis(address=("localhost", instance.port), resp_version=-1, **kwargs) as r:
         try:
             yield r
@@ -37,7 +37,7 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
-    servers, stdout = redis_server.start_cluster(3, dockerimage=dockerimage, extraparams=extraparams)
+    servers, stdout = redis_server.start_cluster(3, extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
     with Redis(address=("localhost", servers[0].port), resp_version=-1) as r:
         import time
 
@@ -46,6 +46,8 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
             result = r(b"CLUSTER", b"INFO", endpoint="masters")
             ready = True
             for res in result.values():
+                if isinstance(res, Exception):
+                    raise res
                 if b"cluster_state:ok" not in res:
                     ready = False
                     break

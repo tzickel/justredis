@@ -1,5 +1,8 @@
 from collections import deque
-from contextlib import asynccontextmanager
+try:
+    from contextlib import asynccontextmanager
+except:
+    from async_generator import asynccontextmanager
 
 
 from .connection import Connection

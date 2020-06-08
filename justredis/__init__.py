@@ -11,7 +11,12 @@ except ImportError:
 
     class AsyncRedis:
         def __init__(self, *args, **kwargs):
-            raise Exception("Using JustRedis asynchronously requires the anyio library to be installed")
+            import sys
+
+            if sys.version_info <= (3, 7):
+                raise Exception("Using JustRedis asynchronously requires the anyio and async_generator library to be installed")
+            else:
+                raise Exception("Using JustRedis asynchronously requires the anyio library to be installed")
 
 
 except SyntaxError:

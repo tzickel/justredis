@@ -1,5 +1,8 @@
 from binascii import crc_hqx
-from contextlib import asynccontextmanager
+try:
+    from contextlib import asynccontextmanager
+except:
+    from async_generator import asynccontextmanager
 from random import choice
 
 from .environment import get_environment
