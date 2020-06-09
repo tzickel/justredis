@@ -317,7 +317,7 @@ class ClusterConnectionPool:
             return {self._last_connection_peername: await self(*cmd, **kwargs)}
         # TODO (api) on an error here, raise an exception ?
         res = {}
-        for address in self.endpoints():
+        for address in await self.endpoints():
             if address[1]["type"] != filter:
                 continue
             address = address[0]

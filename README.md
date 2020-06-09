@@ -21,7 +21,7 @@ A Redis client for Python supporting both latest Redis features and Python synch
 | [SSL](https://redis.io/topics/encryption) | V | See the [SSL connection parameters](#settings-options) |
 | [Script caching](https://redis.io/commands/evalsha) | X | Planned |
 | [Client side caching](https://redis.io/topics/client-side-caching) | X | Planned |
-| [Sentinal](https://redis.io/topics/sentinel) | X | Not a high priority |
+| [Sentinel](https://redis.io/topics/sentinel) | X | Not a high priority |
 
 ## Roadmap
 

@@ -13,7 +13,7 @@ def get_runtime_params_for_redis(dockerimage="redis"):
         return {"extrapath": redis_6_path}
     elif dockerimage == "redis:5" and redis_5_path:
         return {"extrapath": os.getenv("REDIS_5_PATH")}
-    elif os.getenv("REDIS_USE_DOCKER"):
+    elif os.getenv("REDIS_USE_DOCKER") is not None:
         return {"dockerimage": dockerimage}
     else:
         return {}
@@ -32,18 +32,18 @@ async def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
             instance.close()
 
 
-def redis_cluster_with_client(dockerimage="redis", extraparams=""):
+async def redis_cluster_with_client(dockerimage="redis", extraparams=""):
     from .. import redis_server
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
     servers, stdout = redis_server.start_cluster(3, extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
-    with Redis(address=("localhost", servers[0].port), resp_version=-1) as r:
-        import time
+    async with AsyncRedis(address=("localhost", servers[0].port), resp_version=-1) as r:
+        import anyio
 
         wait = 60
         while wait:
-            result = r(b"CLUSTER", b"INFO", endpoint="masters")
+            result = await r(b"CLUSTER", b"INFO", endpoint="masters")
             ready = True
             for res in result.values():
                 if isinstance(res, Exception):
@@ -53,7 +53,7 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
                     break
             if ready:
                 break
-            time.sleep(1)
+            await anyio.sleep(1)
             wait -= 1
         if not wait:
             raise Exception("Cluster is down, could not run test")
@@ -72,13 +72,13 @@ def generate_fixture_params(cluster=True):
     return params
 
 
-@pytest.fixture(scope="module", params=generate_fixture_params())
-def client(request):
+@pytest.fixture(params=generate_fixture_params())
+async def client(request):
     if request.param[1]:
-        for item in redis_cluster_with_client(request.param[0]):
+        async for item in redis_cluster_with_client(request.param[0]):
             yield item
     else:
-        for item in redis_with_client(request.param[0]):
+        async for item in redis_with_client(request.param[0]):
             yield item
 
 

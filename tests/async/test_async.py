@@ -28,3 +28,16 @@ async def test_auth(client_with_blah_password):
     # Correct password
     async with AsyncRedis(address=address, password="blah") as r:
         assert await r("set", "auth_a", "b") == b"OK"
+
+
+@pytest.mark.anyio
+async def test_simple(client):
+    r = client
+    assert await r("set", "simple_a", "a") == b"OK"
+    assert await r("set", "simple_b", "b") == b"OK"
+    assert await r("set", "simple_c", "c") == b"OK"
+    assert await r("set", "simple_{a}b", "d") == b"OK"
+    assert await r("get", "simple_a") == b"a"
+    assert await r("get", "simple_b") == b"b"
+    assert await r("get", "simple_c") == b"c"
+    assert await r("get", "simple_{a}b") == b"d"
