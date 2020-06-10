@@ -82,23 +82,23 @@ async def client(request):
             yield item
 
 
-@pytest.fixture(scope="module", params=generate_fixture_params("only"))
-def cluster_client(request):
+@pytest.fixture(params=generate_fixture_params("only"))
+async def cluster_client(request):
     if request.param[1]:
-        for item in redis_cluster_with_client(request.param[0]):
+        async for item in redis_cluster_with_client(request.param[0]):
             yield item
     else:
-        for item in redis_with_client(request.param[0]):
+        async for item in redis_with_client(request.param[0]):
             yield item
 
 
-@pytest.fixture(scope="module", params=generate_fixture_params(False))
-def no_cluster_client(request):
+@pytest.fixture(params=generate_fixture_params(False))
+async def no_cluster_client(request):
     if request.param[1]:
-        for item in redis_cluster_with_client(request.param[0]):
+        async for item in redis_cluster_with_client(request.param[0]):
             yield item
     else:
-        for item in redis_with_client(request.param[0]):
+        async for item in redis_with_client(request.param[0]):
             yield item
 
 

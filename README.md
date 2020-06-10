@@ -8,6 +8,7 @@ A Redis client for Python supporting both latest Redis features and Python synch
 - Per context and command properties (database #, decoding, RESP3 attributes)
 - Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [AnyIO](https://github.com/agronholm/anyio) which needs to be installed as well if you want async I/O)
 - Modular API allowing for easy support for multiple synchronous and asynchronous event loops and disabling of unneeded features
+- No legacy support for old language features
 
 ## Redis features support table
 
@@ -19,9 +20,9 @@ A Redis client for Python supporting both latest Redis features and Python synch
 | [Cluster](https://redis.io/topics/cluster-spec) | V | See [Cluster commands](#cluster-commands) |
 | [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 and RESP3 difference section](#resp2-and-resp3-difference) |
 | [SSL](https://redis.io/topics/encryption) | V | See the [SSL connection parameters](#settings-options) |
-| [Script caching](https://redis.io/commands/evalsha) | X | Planned |
-| [Client side caching](https://redis.io/topics/client-side-caching) | X | Planned |
-| [Sentinel](https://redis.io/topics/sentinel) | X | Not a high priority |
+| [Script caching](https://redis.io/commands/evalsha) | X |  |
+| [Client side caching](https://redis.io/topics/client-side-caching) | X |  |
+| [Sentinel](https://redis.io/topics/sentinel) | X |  |
 
 ## Roadmap
 
@@ -32,7 +33,6 @@ Getting it out of alpha:
   - [ ] Is it easy to extend the module
   - [ ] Should we add helper functions for SCAN iterators and other API ?
 - [ ] Resolving some of the TODO in code
-- [ ] Async code test parity with regular version
 
 General:
 - More features in the support table
