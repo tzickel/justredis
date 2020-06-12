@@ -5,6 +5,8 @@ RUN cd /tmp && curl -s http://download.redis.io/releases/redis-6.0.4.tar.gz -O &
 
 RUN cd /tmp && curl https://bitbucket.org/pypy/pypy/downloads/pypy3.6-v7.3.1-linux64.tar.bz2 -s -L -O && cd /opt/python && tar -xvof /tmp/pypy3.6-v7.3.1-linux64.tar.bz2 > /dev/null 2>&1
 
+RUN /opt/python/cp38-cp38/bin/pip install tox
+
 #WORKDIR /opt
 
 #ADD https://api.github.com/repos/tzickel/justredis/git/refs/heads/master version.json
@@ -15,5 +17,4 @@ WORKDIR /opt/justredis
 
 ADD . .
 
-RUN /opt/python/cp38-cp38/bin/pip install tox
 RUN REDIS_6_PATH=/tmp/redis-6.0.4/src REDIS_5_PATH=/tmp/redis-5.0.8/src PATH=$PATH:/opt/python/cp38-cp38/bin:/opt/python/cp37-cp37m/bin:/opt/python/cp36-cp36m/bin:/opt/python/cp35-cp35m/bin:/opt/python/pypy3.6-v7.3.1-linux64/bin /opt/python/cp38-cp38/bin/tox
