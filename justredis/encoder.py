@@ -36,24 +36,18 @@ def parse_encoding(encoding):
 
 # We add data to encode in 2 steps to avoid an invalid encoding causing to drop the connections
 class RedisRespEncoder:
-    def __init__(self, encoder=None, cutoff_size=6000, cb_before_adding=None, **kwargs):
+    def __init__(self, encoder=None, cutoff_size=6000, **kwargs):
         self._encoder = parse_encoding(encoder)
         self._cutoff_size = cutoff_size
-        self._cb_before_adding = cb_before_adding
         self._chunks = deque()
 
     def encode(self, *cmd):
         data = []
         add_data = data.append
         encoder = self._encoder
-        cb_before_adding = self._cb_before_adding
-        cmd = [encoder(x) for x in cmd]
-        if cb_before_adding:
-            res = cb_before_adding(*cmd)
-            if res is not None:
-                cmd = res
         add_data(b"*%d\r\n" % len(cmd))
         for arg in cmd:
+            arg = encoder(arg)
             if isinstance(arg, memoryview):
                 length = arg.nbytes
             else:
@@ -67,15 +61,10 @@ class RedisRespEncoder:
         data = []
         add_data = data.append
         encoder = self._encoder
-        cb_before_adding = self._cb_before_adding
         for cmd in cmds:
-            cmd = [encoder(x) for x in cmd]
-            if cb_before_adding:
-                res = cb_before_adding(*cmd)
-                if res is not None:
-                    cmd = res
             add_data(b"*%d\r\n" % len(cmd))
             for arg in cmd:
+                arg = encoder(arg)
                 if isinstance(arg, memoryview):
                     length = arg.nbytes
                 else:
