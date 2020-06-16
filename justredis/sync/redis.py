@@ -1,7 +1,7 @@
 from .connectionpool import ConnectionPool
 from .cluster import ClusterConnectionPool
 from ..decoder import Error
-from ..utils import parse_url, merge_dicts
+from ..utils import parse_url, merge_dicts, CommandParser
 
 
 # TODO (misc) document all the kwargs everywhere
@@ -71,6 +71,7 @@ class Redis(ModifiedRedis):
             pool_factory = ConnectionPool
         elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
+        kwargs["command_cache"] = CommandParser()
         super(Redis, self).__init__(pool_factory(**kwargs), custom_command_class=custom_command_class)
 
     def __del__(self):

@@ -12,7 +12,7 @@ from .environment import get_environment
 
 
 class ConnectionPool:
-    def __init__(self, max_connections=None, wait_timeout=None, **kwargs):
+    def __init__(self, max_connections=None, wait_timeout=None, cache_enabled=False, cache_prefixes=None, cache_optin=None, **kwargs):
         self._max_connections = max_connections
         self._wait_timeout = wait_timeout
         self._connection_settings = kwargs
@@ -23,10 +23,20 @@ class ConnectionPool:
         self._connections_in_use = set()
         self._closed = False
 
+        self._cache_enabled = cache_enabled
+        self._cache_connection = None
+        self._cache_prefixes = cache_prefixes
+        self._cache_optin = cache_optin
+        self._cached_data = {}
+        self._connection_settings["cached_data"] = self._cached_data
+
+        self._command_cache = {}
+
     def __del__(self):
         self.close()
 
     def close(self):
+        # TODO close cache connection as well
         with self._lock:
             if not self._closed:
                 # We do this first, so if another thread calls release it won't get back to the pool
@@ -38,6 +48,28 @@ class ConnectionPool:
                 self._connections_in_use.clear()
                 self._limit = get_environment(**self.connection_settings).semaphore(self._max_connections) if self._max_connections else None
             self._closed = True
+
+    def _check_cache(self):
+        if not self._cache_enabled:
+            return
+        # TODO this should be locked
+        if self._cache_connection is None or self._cache_connection.closed():
+            self._cached_data = {}
+            # TODO should we implment a circut breaker for this ? in the plugin maybe :)
+            # TODO cache should be bytearray ?
+            # TOD Make sure its' bytes ?
+            self._cache_connection = Connection.create(**self._connection_settings)
+            self._cache_connection.push_command(b"SUBSCRIBE", b"__redis__:invalidate")
+        # TODO this might be EOF, so handle it
+        while self._cache_connection.has_data():
+            msg_type, msg_channel, msg_data = self._cache_connection.pushed_message()
+            if msg_channel != b"__redis__:invalidate":
+                raise Exception("Invalid channel")
+            if msg_type == b"message":
+                for key in msg_data:
+                    import pdb; pdb.set_trace()
+                    del self._cached_data[key]
+        return self._cache_connection._client_id
 
     def take(self):
         if self._closed:
@@ -60,6 +92,10 @@ class ConnectionPool:
                     self._limit.release()
                 raise
         self._connections_in_use.add(conn)
+
+        tmp = self._check_cache()
+        if conn.cache_client_id != tmp:
+            conn.cache_client_id = tmp
         return conn
 
     def release(self, conn):

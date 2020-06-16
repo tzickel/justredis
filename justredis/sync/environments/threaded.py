@@ -2,6 +2,7 @@ from threading import Lock, Semaphore
 import socket
 import sys
 import ssl
+import select
 
 
 platform = ""
@@ -101,6 +102,15 @@ class SocketWrapper:
         if self._socket.family == socket.AF_INET6:
             peername = peername[:2]
         return peername
+
+    def is_readable(self):
+        poll = getattr(select, "poll", False)
+        if poll:
+            p = poll()
+            p.register(self._socket, select.POLLIN)
+            return bool(p.poll(0))
+        ready, _, _ = select.select([self._socket], [], [], 0)
+        return bool(ready)
 
 
 class OurSemaphore:

@@ -77,3 +77,43 @@ def is_multiple_commands(*cmd):
         return True
     else:
         return False
+
+
+# TODO what about encoding first... ?
+class CommandParser:
+    def __init__(self):
+        self._commands = None
+
+    def initialized(self):
+        return self._commands is not None
+
+    def set_commands(self, value):
+        if self._commands is None:
+            self._commands = {}
+        for item in value:
+            self._commands[item[0].upper()] = item[1:]
+
+    def parse_command(self, *cmd):
+        command = cmd[0]
+        encode = getattr(command, "encode", None)
+        if encode:
+            command = encode("ascii")
+        command = command.upper()
+        if self._commands is None:
+            return command, None, None
+        command_info = self._commands.get(command)
+        if command_info is None:
+            return command, None, None
+        if command_info[2] == 0:
+            return command, command_info, None
+        keys = []
+        start = command_info[2]
+        end = len(cmd) if command_info[3] == -1 else command_info[3]
+        end += 1
+        skip = command_info[4]
+        for i in range(start, end, skip):
+            try:
+                keys.append(cmd[i])
+            except IndexError:
+                break
+        return command, command_info, keys

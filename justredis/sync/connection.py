@@ -58,6 +58,9 @@ class Connection:
         self._seen_ask = False
         self._allow_multi = False
         self._default_database = self._last_database = database
+        self._client_id = None
+        self._cache_client_id = None
+        self._command_cache = None
 
         connected = False
         # Try to negotiate RESP3 first if RESP2 is not forced
@@ -93,6 +96,29 @@ class Connection:
         if database != 0:
             self._command(b"SELECT", database)
 
+        # actually we need to make sure it's all "bytes" so no decoding enformcent !
+        try:
+            self._client_id = self._command(b"CLIENT", b"ID")
+            if hasattr(self._client_id, "data"):
+                self._client_id = self._client_id.data
+        # Only exists in Redis 5
+        except Error:
+            pass
+
+        command_parser = kwargs.get("command_cache")
+        try:
+            # TODO (misc) do we want a lock on this ?
+            if command_parser is not None and not command_parser.initialized():
+                commands = self._command(b"COMMAND")
+                if hasattr(commands, "data"):
+                    commands = commands.data
+                command_parser.set_commands(commands)
+        except Error:
+            command_parser.set_commands([])
+        self._cached_data = kwargs.get("cached_data")
+        print(self._cached_data)
+        self._command_cache = command_parser
+
     def __del__(self):
         self.close()
 
@@ -109,6 +135,9 @@ class Connection:
     # TODO (misc) better check ? (maybe it's closed, but the socket doesn't know it yet..., will be known the next time though)
     def closed(self):
         return self._socket is None
+
+    def has_data(self):
+        return self._socket.is_readable()
 
     def peername(self):
         return self._peername
@@ -210,10 +239,22 @@ class Connection:
                 self._decoder = orig_decoder
 
     def _command(self, *cmd):
-        command_name = get_command_name(cmd)
-        if command_name in not_allowed_push_commands:
+        can_cache_result = False
+        if self._command_cache:
+            name, info, keys = self._command_cache.parse_command(*cmd)
+            if info and b'readonly' in info[1] and keys:
+                can_cache_result = True
+                cache = self._cached_data.get(keys[0])
+                if cache:
+                    # TODO should we encode here whic result was expected ?
+                    reply = cache.get(cmd)
+                    if reply:
+                        return reply
+        else:
+            name = get_command_name(cmd)
+        if name in not_allowed_push_commands:
             raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
-        if command_name == b"MULTI" and not self._allow_multi:
+        if name == b"MULTI" and not self._allow_multi:
             raise ValueError("Take a connection if you want to use MULTI command.")
         self._send(*cmd)
         res = self._recv()
@@ -227,6 +268,9 @@ class Connection:
         if res == timeout_error:
             self.close()
             raise timeout_error
+        if self._command_cache and can_cache_result:
+            # THREAD ? RACE CONDITION WITH OTHER SOCKET
+            self._cached_data.setdefault(keys[0], {})[cmd] = res
         return res
 
     def _commands(self, *cmds):
@@ -244,7 +288,7 @@ class Connection:
                 result = self._recv()
                 if isinstance(result, Error):
                     if result.args[0].startswith("MOVED "):
-                        self.seen_moved = True
+                        self._seen_moved = True
                     found_errors = True
                 if result == timeout_error:
                     self.close()
@@ -271,3 +315,14 @@ class Connection:
 
     def allow_multi(self, allow):
         self._allow_multi = allow
+
+    @property
+    def cache_client_id(self):
+        return self._cache_client_id
+
+    @cache_client_id.setter
+    def cache_client_id(self, value):
+        optin = self._settings.get("cache_optin", False)
+        prefixes = self._settings.get("cache_prefixes", None)
+        self._command(b"CLIENT", b"TRACKING", b"on", b"REDIRECT", value)
+        self._cache_client_id = value
