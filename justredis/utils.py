@@ -79,41 +79,22 @@ def is_multiple_commands(*cmd):
         return False
 
 
-# TODO what about encoding first... ?
-class CommandParser:
+class CommandsInfo:
     def __init__(self):
         self._commands = None
 
     def initialized(self):
         return self._commands is not None
 
-    def set_commands(self, value):
+    def set_commands(self, commands):
         if self._commands is None:
             self._commands = {}
-        for item in value:
+        for item in commands:
             self._commands[item[0].upper()] = item[1:]
 
-    def parse_command(self, *cmd):
-        command = cmd[0]
-        encode = getattr(command, "encode", None)
-        if encode:
-            command = encode("ascii")
-        command = command.upper()
-        if self._commands is None:
-            return command, None, None
-        command_info = self._commands.get(command)
-        if command_info is None:
-            return command, None, None
-        if command_info[2] == 0:
-            return command, command_info, None
-        keys = []
-        start = command_info[2]
-        end = len(cmd) if command_info[3] == -1 else command_info[3]
-        end += 1
-        skip = command_info[4]
-        for i in range(start, end, skip):
-            try:
-                keys.append(cmd[i])
-            except IndexError:
-                break
-        return command, command_info, keys
+    def get_command(self, command):
+        ret = self._commands.get(command)
+        # This is done because the server might have loaded modules, and we want to update our list (you shouldn't be calling non-existing commands all the time)
+        if ret is None:
+            self._commands = None
+        return ret

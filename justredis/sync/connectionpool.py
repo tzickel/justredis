@@ -93,9 +93,9 @@ class ConnectionPool:
                 raise
         self._connections_in_use.add(conn)
 
-        tmp = self._check_cache()
-        if conn.cache_client_id != tmp:
-            conn.cache_client_id = tmp
+        #tmp = self._check_cache()
+        #if conn.cache_client_id != tmp:
+            #conn.cache_client_id = tmp
         return conn
 
     def release(self, conn):
@@ -129,10 +129,10 @@ class ConnectionPool:
             yield conn
         finally:
             # We need to clean up the connection back to a normal state.
-            try:
-                conn._command(b"DISCARD")
-            except Exception:
-                pass
+#            try:
+#                conn._command(b"DISCARD")
+#            except Exception:
+#                pass
             conn.allow_multi(False)
             self.release(conn)
 

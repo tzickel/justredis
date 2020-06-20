@@ -3,6 +3,7 @@ from ..decoder import RedisRespDecoder, need_more_data, Error
 from ..encoder import RedisRespEncoder
 from ..errors import CommunicationError, PipelinedExceptions
 from ..utils import get_command_name, is_multiple_commands
+from ..command import RedisCommand
 
 
 # TODO (correctness) watch for manual SELECT and set_database !
@@ -29,7 +30,6 @@ class Connection:
         self._socket = None
 
     # TODO (api) client_name with connection pool (?)
-    # TODO (documentation) the username/password/client_name need the decoding of whatever **kwargs is passed
     def _init(self, username=None, password=None, client_name=None, resp_version=2, socket_factory="tcp", connect_retry=2, database=0, **kwargs):
         resp_version = int(resp_version)
         connect_retry = int(connect_retry)
@@ -37,8 +37,6 @@ class Connection:
 
         if resp_version not in (-1, 2, 3):
             raise ValueError("Unsupported RESP protocol version %s" % resp_version)
-
-        self._settings = kwargs
 
         environment = get_environment(**kwargs)
         connect_retry += 1
@@ -50,6 +48,8 @@ class Connection:
                 connect_retry -= 1
                 if not connect_retry:
                     raise CommunicationError() from e
+
+        self._settings = kwargs
         self._encoder = RedisRespEncoder(**kwargs)
         self._decoder = RedisRespDecoder(**kwargs)
         self._seen_eof = False
@@ -60,7 +60,6 @@ class Connection:
         self._default_database = self._last_database = database
         self._client_id = None
         self._cache_client_id = None
-        self._command_cache = None
 
         connected = False
         # Try to negotiate RESP3 first if RESP2 is not forced
@@ -75,7 +74,7 @@ class Connection:
                 args.extend((b"SETNAME", client_name))
             try:
                 # TODO (misc) do something with the result ?
-                self._command(*args)
+                self._command(RedisCommand.create(*args))
                 connected = True
             except Error as e:
                 # This is to seperate an login error from the server not supporting RESP3
@@ -97,27 +96,13 @@ class Connection:
             self._command(b"SELECT", database)
 
         # actually we need to make sure it's all "bytes" so no decoding enformcent !
-        try:
-            self._client_id = self._command(b"CLIENT", b"ID")
-            if hasattr(self._client_id, "data"):
-                self._client_id = self._client_id.data
+        #try:
+        #    self._client_id = self._command(b"CLIENT", b"ID")
+        #    if hasattr(self._client_id, "data"):
+        #        self._client_id = self._client_id.data
         # Only exists in Redis 5
-        except Error:
-            pass
-
-        command_parser = kwargs.get("command_cache")
-        try:
-            # TODO (misc) do we want a lock on this ?
-            if command_parser is not None and not command_parser.initialized():
-                commands = self._command(b"COMMAND")
-                if hasattr(commands, "data"):
-                    commands = commands.data
-                command_parser.set_commands(commands)
-        except Error:
-            command_parser.set_commands([])
-        self._cached_data = kwargs.get("cached_data")
-        print(self._cached_data)
-        self._command_cache = command_parser
+        #except Error:
+        #       pass
 
     def __del__(self):
         self.close()
@@ -142,12 +127,13 @@ class Connection:
     def peername(self):
         return self._peername
 
-    def _send(self, *cmd):
+    # TODO (corectness) implment the set_database here
+    def _send(self, cmd):
         try:
-            if is_multiple_commands(*cmd):
-                self._encoder.encode_multiple(*cmd)
+            if isinstance(cmd, RedisCommand):
+                self._encoder.encode(cmd)
             else:
-                self._encoder.encode(*cmd)
+                self._encoder.encode_multiple(cmd)
             while True:
                 data = self._encoder.extract()
                 if data is None:
@@ -214,81 +200,45 @@ class Connection:
                 self._command(b"SELECT", database)
                 self._last_database = database
 
-    def __call__(self, *cmd, decoder=False, attributes=None, database=None, asking=False):
-        if not cmd:
-            raise ValueError("No command provided")
-        orig_decoder = None
-        if decoder != False or attributes is not None:
-            orig_decoder = self._decoder
-            kwargs = self._settings.copy()
-            if decoder != False:
-                kwargs["decoder"] = decoder
-            if attributes is not None:
-                kwargs["attributes"] = attributes
-            self._decoder = RedisRespDecoder(**kwargs)
-        try:
-            self.set_database(database)
-            if is_multiple_commands(*cmd):
-                return self._commands(*cmd)
-            else:
-                if asking:
-                    self._command(b"ASKING")
-                return self._command(*cmd)
-        finally:
-            if orig_decoder is not None:
-                self._decoder = orig_decoder
-
-    def _command(self, *cmd):
-        can_cache_result = False
-        if self._command_cache:
-            name, info, keys = self._command_cache.parse_command(*cmd)
-            if info and b'readonly' in info[1] and keys:
-                can_cache_result = True
-                cache = self._cached_data.get(keys[0])
-                if cache:
-                    # TODO should we encode here whic result was expected ?
-                    reply = cache.get(cmd)
-                    if reply:
-                        return reply
+    def __call__(self, cmd):
+        if isinstance(cmd, RedisCommand):
+            self._command(cmd)
         else:
-            name = get_command_name(cmd)
+            self._commands(cmd)
+
+    def _validate(self, cmd):
+        name = cmd.name()
         if name in not_allowed_push_commands:
-            raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
+            raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % name)
         if name == b"MULTI" and not self._allow_multi:
             raise ValueError("Take a connection if you want to use MULTI command.")
-        self._send(*cmd)
-        res = self._recv()
-        if isinstance(res, Error):
-            if res.args[0].startswith("MOVED "):
-                self._seen_moved = True
-            if res.args[0].startswith("ASK "):
-                _, _, address = res.args[0].split(" ")
-                self._seen_ask = address
-            raise res
-        if res == timeout_error:
-            self.close()
-            raise timeout_error
-        if self._command_cache and can_cache_result:
-            # THREAD ? RACE CONDITION WITH OTHER SOCKET
-            self._cached_data.setdefault(keys[0], {})[cmd] = res
-        return res
 
-    def _commands(self, *cmds):
+    def _command(self, cmd):
+        try:
+            self._validate(cmd)
+            self._send(cmd)
+            res = self._recv()
+            if res == timeout_error:
+                self.close()
+                raise timeout_error
+            cmd.set_result(res)
+            if isinstance(res, Error):
+                raise res
+        except Exception as e:
+            cmd.set_result(e)
+            raise
+
+    def _commands(self, cmds):
+        found_errors = False
         for cmd in cmds:
-            command_name = get_command_name(cmd)
-            if command_name in not_allowed_push_commands:
-                raise ValueError("Command %s is not allowed to be called directly, use the appropriate API instead" % cmd)
-            if command_name == b"MULTI" and not self._allow_multi:
-                raise ValueError("Take a connection if you want to use MULTI command.")
-        self._send(*cmds)
+            self._validate(cmd)
+        self._send(cmds)
         res = []
         found_errors = False
-        for _ in cmds:
+        for cmd in cmds:
             try:
                 result = self._recv()
                 if isinstance(result, Error):
-                    if result.args[0].startswith("MOVED "):
-                        self._seen_moved = True
                     found_errors = True
                 if result == timeout_error:
                     self.close()
@@ -300,29 +250,21 @@ class Connection:
             raise PipelinedExceptions(res)
         return res
 
-    def seen_moved(self):
-        if self._seen_moved:
-            self._seen_moved = False
-            return True
-        return False
-
-    def seen_asked(self):
-        if self._seen_ask:
-            ret = self._seen_ask
-            self._seen_ask = False
-            return ret
-        return False
-
     def allow_multi(self, allow):
         self._allow_multi = allow
 
-    @property
+"""    @property
     def cache_client_id(self):
         return self._cache_client_id
 
     @cache_client_id.setter
     def cache_client_id(self, value):
         optin = self._settings.get("cache_optin", False)
+        optout = self._settings.get("cache_optout", False)
+        if optin and output:
+            raise Exception("Can't set both OPTIN and OPTOUT")
         prefixes = self._settings.get("cache_prefixes", None)
-        self._command(b"CLIENT", b"TRACKING", b"on", b"REDIRECT", value)
+        cmd = [b"CLIENT", b"TRACKING", b"on", b"REDIRECT", value]
+        self._command(*cmd)
         self._cache_client_id = value
+"""

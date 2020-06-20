@@ -1,12 +1,12 @@
 from .connectionpool import ConnectionPool
 from .cluster import ClusterConnectionPool
 from ..decoder import Error
-from ..utils import parse_url, merge_dicts, CommandParser
+from ..utils import parse_url, merge_dicts, CommandsInfo
+from ..command import RedisCommand
 
 
-# TODO (misc) document all the kwargs everywhere
 # TODO (api) internal remove from connectionpool the __enter__/__exit__ and use take(**kwargs)/release
-
+# TODO (misc) the name is connection manager not pool
 
 # We do this seperation to allow changing per command and connection settings easily
 class ModifiedRedis:
@@ -15,6 +15,7 @@ class ModifiedRedis:
         self._custom_command_class = custom_command_class
         self._custom_command = custom_command_class(self) if self._custom_command_class else None
         self._settings = kwargs
+        self._commands_info = CommandsInfo()
 
     def __del__(self):
         self.close()
@@ -28,12 +29,18 @@ class ModifiedRedis:
     def __exit__(self, *args):
         self.close()
 
+    # Even if multiple commands are sent, they are not related
     def __call__(self, *cmd, **kwargs):
+        if not self._commands_info.initialized():
+            with self._connection_pool.connection() as c:
+                res = c(RedisCommand(b"COMMAND"))
+
+        cmds = RedisCommand.create(*cmd)
         settings = merge_dicts(self._settings, kwargs)
         if settings is None:
-            return self._connection_pool(*cmd)
+            return self._connection_pool(cmds)
         else:
-            return self._connection_pool(*cmd, **settings)
+            return self._connection_pool(cmds, **settings)
 
     def connection(self, *args, push=False, **kwargs):
         if args:
@@ -71,7 +78,6 @@ class Redis(ModifiedRedis):
             pool_factory = ConnectionPool
         elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
-        kwargs["command_cache"] = CommandParser()
         super(Redis, self).__init__(pool_factory(**kwargs), custom_command_class=custom_command_class)
 
     def __del__(self):

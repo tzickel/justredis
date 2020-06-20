@@ -249,8 +249,6 @@ class ClusterConnectionPool:
         pool.release(conn)
 
     def __call__(self, *cmd, endpoint=False, **kwargs):
-        if not cmd:
-            raise ValueError("No command provided")
         if endpoint == "masters":
             return self._on_all(*cmd)
         if self._clustered == False:
@@ -297,8 +295,9 @@ class ClusterConnectionPool:
         finally:
             # We need to clean up the connection back to a normal state.
             try:
-                if not conn.closed():
-                    conn._command(b"DISCARD")
+                pass
+                #if not conn.closed():
+                    #conn._command(b"DISCARD")
             except Error:
                 pass
             finally:
