@@ -1,6 +1,6 @@
 ## What ?
 
-A Redis client for Python supporting both latest Redis features and Python synchronous (Python 3.5+) and asynchronous (Python 3.6+) communication.
+A Redis client for Python supporting many Redis features and Python synchronous (Python 3.5+) and asynchronous (Python 3.6+) communication.
 
 ## [Why](https://xkcd.com/927/) ?
 
@@ -30,8 +30,11 @@ Getting it out of alpha:
 - [ ] API Finalization (your feedback is appreciated)
   - [ ] Should calling redis be using \_\_call__() or a special method such as "command" for refactoring ?
   - [ ] Is the modify() API flexiable enough ?
-  - [ ] Is it easy to extend the module
+  - [ ] Is it easy to extend the module ?
   - [ ] Should we add helper functions for SCAN iterators and other API ?
+- [ ] Asynchronous support
+  - [ ] Automate code convertion between sync and async
+  - [ ] Make sure cancelations are handled properly
 - [ ] Resolving some of the TODO in code
 
 General:
@@ -55,7 +58,7 @@ git+git://github.com/tzickel/justredis@master#egg=justredis
 
 Replace master with the specific branch or version tag you want.
 
-If you want to use asynchronous I/O frameworks asyncio or trio or curio with this library, you need to install the anyio library as well.
+If you want to use asynchronous I/O frameworks asyncio or trio or curio with this library, you need to install the AnyIO library as well.
 
 ## Examples
 

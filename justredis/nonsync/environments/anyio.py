@@ -1,4 +1,8 @@
 import anyio
+try:
+    anyio.create_tcp_listener
+except AttributeError:
+    raise AttributeError("You are using an old and incompatible AnyIO version, the minimum required version is AnyIO 2.0.0 .")
 import socket
 import sys
 import ssl
@@ -57,7 +61,7 @@ async def sslsocket(address=None, ssl_context=None, **kwargs):
         keyfile = kwargs.get("ssl_keyfile")
         if certfile:
             ssl_context.load_cert_chain(certfile, keyfile)
-    return await tcpsocket(ssl_context=ssl_context, autostart_tls=True, **kwargs)
+    return await tcpsocket(ssl_context=ssl_context, tls=True, **kwargs)
 
 
 class SocketWrapper:
@@ -78,9 +82,9 @@ class SocketWrapper:
     async def send(self, data):
         if self._socket_timeout:
             async with anyio.fail_after(self._socket_timeout):
-                await self._socket.send_all(data)
+                await self._socket.send(data)
         else:
-            await self._socket.send_all(data)
+            await self._socket.send(data)
 
     # If you override this, make sure to return an empty bytes for EOF and a None for timeout !
     async def recv(self, timeout=False):
@@ -89,14 +93,14 @@ class SocketWrapper:
         if timeout:
             try:
                 async with anyio.fail_after(timeout):
-                    return await self._socket.receive_some(self._buffersize)
+                    return await self._socket.receive(self._buffersize)
             except TimeoutError:
                 return None
         else:
-            return await self._socket.receive_some(self._buffersize)
+            return await self._socket.receive(self._buffersize)
 
     def peername(self):
-        peername = self._socket.peer_address
+        peername = self._socket.extra(anyio.abc.SocketAttribute.remote_address)
         if isinstance(peername, (list, tuple)):
             peername = peername[:2]
         return peername

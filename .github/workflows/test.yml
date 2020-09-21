@@ -17,5 +17,5 @@ jobs:
       run: |
         CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)" > /dev/null 2>&1
         brew install python redis > /dev/null 2>&1
-        python3 -m pip install tox
-        python3 -m tox -e py37
+        python3 -m pip install tox > /dev/null 2>&1
+        python3 -m tox -e py38
