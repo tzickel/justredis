@@ -23,6 +23,7 @@ from justredis import Redis
 # TODO (misc) in the future allow direct redis instances ?
 # TODO (misc) enforce REDIS_PATH as input, don't blindly accept it (so tests run twice)
 
+
 def get_runtime_params_for_redis(dockerimage="redis"):
     redis_6_path = os.getenv("REDIS_6_PATH")
     redis_5_path = os.getenv("REDIS_5_PATH")

@@ -50,15 +50,17 @@ General:
 
 ## Installing
 
-For now you can install this via this github repository by pip installing or adding to your requirements.txt file:
+The project can be found in PyPI as justredis. Install it via pip or requierments.txt file:
 
+```bash
+pip install justredis
 ```
-git+git://github.com/tzickel/justredis@master#egg=justredis
+
+If you want to use asynchronous I/O frameworks asyncio or trio or curio with this library, you need to install the AnyIO library as well:
+
+```bash
+pip install anyio
 ```
-
-Replace master with the specific branch or version tag you want.
-
-If you want to use asynchronous I/O frameworks asyncio or trio or curio with this library, you need to install the AnyIO library as well.
 
 ## Examples
 

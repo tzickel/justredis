@@ -63,7 +63,7 @@ class Redis(ModifiedRedis):
 
     def __init__(self, pool_factory=ClusterConnectionPool, custom_command_class=None, **kwargs):
         """
-            Currently documented in README.md
+        Currently documented in README.md
         """
         if pool_factory == "pool":
             pool_factory = ConnectionPool

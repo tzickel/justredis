@@ -5,7 +5,7 @@ from justredis import AsyncRedis, Error, CommunicationError
 @pytest.mark.anyio
 async def test_connection_error():
     with pytest.raises(CommunicationError):
-        async with AsyncRedis(address=('127.0.0.222', 11121)) as r:
+        async with AsyncRedis(address=("127.0.0.222", 11121)) as r:
             await r("set", "a", "b")
 
 
