@@ -14,7 +14,7 @@ except:
 def pytest_ignore_collect(path, config):
     outcome = yield
     if "async" in str(path) and anyio is None:
-        warnings.warn("Skipping async tests because anyio is not installed")
+        warnings.warn("Skipping async tests because AnyIO is not installed.")
         outcome.force_result(True)
 
 
