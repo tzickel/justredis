@@ -15,9 +15,11 @@ jobs:
       with:
         python-version: 3.x
     - name: Install dependencies
-      run: pip install -U pip setuptools wheel
+      run: pip install -U pip setuptools wheel twine
     - name: Create packages
       run: python setup.py sdist bdist_wheel
+    - name: Check packages
+      run: twine check dist/*
     - name: Publish a Python distribution to PyPI
       uses: pypa/gh-action-pypi-publish@master
       with:

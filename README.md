@@ -41,6 +41,7 @@ General:
 - More features in the support table
 - Better test coverage
 - Resolve all TODO in code
+- Move documentation to topics + docstrings
 
 ## Not on roadmap (for now?)
 
@@ -102,7 +103,7 @@ with r.connection(key="a") as c:
 while True:
     with r.connection(key="counter") as c:
         c("watch", "counter")
-        value = int(c("get", "counter")) or 0
+        value = int(c("get", "counter") or 0)
         c("multi")
         c("set", "counter", value + 1)
         if c("exec") is None: # Redis returns None in EXEC command when the transaction failed
