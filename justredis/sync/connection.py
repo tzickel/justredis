@@ -129,6 +129,9 @@ class Connection:
         except Exception as e:
             self.close()
             raise CommunicationError("I/O error while trying to send a command") from e
+        except BaseException:
+            self.close()
+            raise
 
     # TODO (misc) should a decoding error be considered an CommunicationError ?
     def _recv(self, timeout=False):
@@ -146,12 +149,18 @@ class Connection:
                         elif data is None:
                             return timeout_error
                         else:
+                            # TODO This check if because another context can close us while we were reading (we can instead simply not remove self._decoder on close)
+                            if not self._decoder:
+                                raise Exception("Connection already closed")
                             self._decoder.feed(data)
                     continue
                 return res
         except Exception as e:
             self.close()
             raise CommunicationError("Error while trying to read a reply") from e
+        except BaseException:
+            self.close()
+            raise
 
     def pushed_message(self, timeout=False, decoder=False, attributes=None):
         orig_decoder = None

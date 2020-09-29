@@ -1,3 +1,7 @@
+try:
+    import anyio
+except:
+    pass
 import pytest
 from justredis import AsyncRedis, Error, CommunicationError
 
@@ -236,3 +240,17 @@ async def test_moved_cluster(cluster_client):
     result = list(result.values())
     assert b"a" in result
     assert len([x for x in result if isinstance(x, Error) and x.args[0].startswith("MOVED ")]) == 2
+
+
+@pytest.mark.anyio
+async def test_cancel(client):
+    r = client
+
+    async with anyio.create_task_group() as tg:
+        await tg.spawn(r, "blpop", "a", 20)
+        await anyio.sleep(1)
+        await tg.cancel_scope.cancel()
+
+    await anyio.sleep(1)
+    async with anyio.create_task_group() as tg:
+        await tg.spawn(r, "blpop", "a", 1)
