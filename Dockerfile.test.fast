@@ -1,0 +1,12 @@
+ARG BASE_IMAGE=quay.io/pypa/manylinux2014_x86_64
+FROM $BASE_IMAGE
+
+ARG REDIS6_VERSION=6.0.8
+RUN cd /tmp && mkdir redis6 && curl -s https://download.redis.io/releases/redis-${REDIS6_VERSION}.tar.gz | tar -xvzo -C redis6 --strip-components=1 > /dev/null 2>&1 && cd redis6 && make > /dev/null 2>&1
+
+WORKDIR /opt/justredis
+
+ADD . .
+
+RUN /opt/python/cp38-cp38/bin/pip install tox > /dev/null 2>&1
+RUN JUSTREDIS_ALLOW_SKIP=1 REDIS_6_PATH=/tmp/redis6/src /opt/python/cp38-cp38/bin/tox -e py38 -- -k "not curio" -k "not trio"

@@ -42,7 +42,13 @@ def redis_with_client(dockerimage="redis", extraparams="", **kwargs):
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
-    instance = redis_server.RedisServer(extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
+    try:
+        instance = redis_server.RedisServer(extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
+    except Exception:
+        if os.getenv("JUSTREDIS_ALLOW_SKIP"):
+            pytest.skip("Could not run redis")
+        else:
+            raise
     with Redis(address=("localhost", instance.port), resp_version=-1, **kwargs) as r:
         try:
             yield r
@@ -55,7 +61,13 @@ def redis_cluster_with_client(dockerimage="redis", extraparams=""):
 
     if isinstance(dockerimage, (tuple, list)):
         dockerimage = dockerimage[0]
-    servers, stdout = redis_server.start_cluster(3, extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
+    try:
+        servers, stdout = redis_server.start_cluster(3, extraparams=extraparams, **get_runtime_params_for_redis(dockerimage))
+    except Exception:
+        if os.getenv("JUSTREDIS_ALLOW_SKIP"):
+            pytest.skip("Could not run redis")
+        else:
+            raise
     try:
         with Redis(address=("localhost", servers[0].port), resp_version=-1) as r:
             import time
