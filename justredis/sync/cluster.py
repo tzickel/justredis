@@ -31,8 +31,8 @@ def calc_hashslot(key):
 
 class ClusterConnectionPool:
     def __init__(self, addresses=None, **kwargs):
+        address = kwargs.pop("address", None)
         if addresses is None:
-            address = kwargs.pop("address", None)
             if address:
                 addresses = (address,)
             else:

@@ -265,6 +265,7 @@ class RedisRespDecoder:
                     # Legacy RESP2 support
                     if length == -1:
                         msg = None
+                        msg_type = Null
                     else:
                         while True:
                             if len(buffer) >= length + 2:
@@ -287,6 +288,7 @@ class RedisRespDecoder:
                 # Legacy RESP2 support
                 if length == -1:
                     msg = None
+                    msg_type = Null
                 else:
                     if last_array is not None:
                         array_stack.append(last_array)
@@ -308,6 +310,7 @@ class RedisRespDecoder:
                 # Legacy RESP2 support
                 if length == -1:
                     msg = None
+                    msg_type = Null
                 else:
                     if last_array is not None:
                         array_stack.append(last_array)
@@ -357,6 +360,7 @@ class RedisRespDecoder:
                 # Legacy RESP2 support
                 if length == -1:
                     msg = None
+                    msg_type = Null
                 else:
                     while True:
                         if len(buffer) >= length + 2:
@@ -389,6 +393,7 @@ class RedisRespDecoder:
                 # Legacy RESP2 support
                 if length == -1:
                     msg = None
+                    msg_type = Null
                 else:
                     if last_array is not None:
                         array_stack.append(last_array)
@@ -406,6 +411,7 @@ class RedisRespDecoder:
                 # Legacy RESP2 support
                 if length == -1:
                     msg = None
+                    msg_type = Null
                 else:
                     if last_array is not None:
                         array_stack.append(last_array)
@@ -422,6 +428,7 @@ class RedisRespDecoder:
                 # Legacy RESP2 support
                 if length == -1:
                     msg = None
+                    msg_type = Null
                 else:
                     if last_array is not None:
                         array_stack.append(last_array)

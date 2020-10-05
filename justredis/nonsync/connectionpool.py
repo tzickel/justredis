@@ -22,6 +22,7 @@ class ConnectionPool:
         self._connection_settings = kwargs
 
         self._lock = get_environment(**kwargs).lock()
+        self._shield = get_environment(**kwargs).shield
         self._limit = get_environment(**kwargs).semaphore(max_connections) if max_connections else None
         self._connections_available = deque()
         self._connections_in_use = set()
@@ -64,18 +65,19 @@ class ConnectionPool:
         return conn
 
     async def release(self, conn):
-        async with self._lock:
-            try:
-                self._connections_in_use.remove(conn)
-            # TODO (correctness) should we release the self._limit here as well ? (or just make close forever)
-            # If this fails, it's a connection from a previous cycle, don't reuse it
-            except KeyError:
-                await conn.aclose()
-                return
-            if not conn.closed():
-                self._connections_available.append(conn)
-            elif self._limit is not None:
-                await self._limit.release()
+        async with self._shield():
+            async with self._lock:
+                try:
+                    self._connections_in_use.remove(conn)
+                # TODO (correctness) should we release the self._limit here as well ? (or just make close forever)
+                # If this fails, it's a connection from a previous cycle, don't reuse it
+                except KeyError:
+                    await conn.aclose()
+                    return
+                if not conn.closed():
+                    self._connections_available.append(conn)
+                elif self._limit is not None:
+                    await self._limit.release()
 
     async def __call__(self, *cmd, **kwargs):
         if not cmd:
