@@ -8,6 +8,7 @@ A Redis client for Python supporting many Redis features and Python synchronous 
 - Per context and command properties (database #, decoding, RESP3 attributes)
 - Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [AnyIO](https://github.com/agronholm/anyio) which needs to be installed as well if you want async I/O)
 - Modular API allowing for easy support for multiple synchronous and asynchronous event loops and disabling of unneeded features
+- CI Testing for CPython 3.5, 3.6, 3.7, 3.8, 3.9 and PyPy3 with Redis 5 and Redis 6
 - No legacy support for old language features
 
 ## Redis features support table
@@ -32,9 +33,6 @@ Getting it out of alpha:
   - [ ] Is the modify() API flexiable enough ?
   - [ ] Is it easy to extend the module ?
   - [ ] Should we add helper functions for SCAN iterators and other API ?
-- [ ] Asynchronous support
-  - [ ] Automate code convertion between sync and async
-  - [ ] Make sure cancelations are handled properly
 - [ ] Resolving some of the TODO in code
 
 General:
@@ -42,6 +40,8 @@ General:
 - Better test coverage
 - Resolve all TODO in code
 - Move documentation to topics + docstrings
+- Automate code convertion between sync and async
+- More CI checks such as flake8, pylint, etc..
 
 ## Not on roadmap (for now?)
 

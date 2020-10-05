@@ -67,10 +67,13 @@ class Redis(ModifiedRedis):
         """
         Currently documented in README.md
         """
+        self._connection_pool = None
         if pool_factory == "pool":
             pool_factory = ConnectionPool
         elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
+        if not hasattr(pool_factory, "__call__"):
+            raise AttributeError("A valid pool_factory is required, if you want to set address, use .from_url() or address=(host, port)")
         super(Redis, self).__init__(pool_factory(**kwargs), custom_command_class=custom_command_class)
 
     def __del__(self):
