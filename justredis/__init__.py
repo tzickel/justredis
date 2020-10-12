@@ -28,4 +28,4 @@ except AttributeError as e:
             raise Exception(e.args[0])
 
 
-__all__ = "AsyncRedis", "Redis", "RedisError", "CommunicationError", "ConnectionPoolError", "ProtocolError", "PipelinedExceptions", "Error"
+__all__ = "AsyncRedis", "Redis", "RedisError", "CommunicationError", "ConnectionPoolError", "ProtocolError", "PipelinedExceptions", "Error", "NoReplicaFound", "NoSentinelFound", "NoEndpointFound"

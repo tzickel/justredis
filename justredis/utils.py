@@ -13,15 +13,26 @@ def parse_url(url):
         res["socket_factory"] = "unix"
     elif result.scheme == "rediss" or result.scheme == "ssl":
         res["socket_factory"] = "ssl"
+    elif result.scheme == "redis-sentinel":
+        res["socket_factory"] = "tcp"
+        res["pool_factory"] = "sentinel"
+    elif result.scheme == "rediss-sentinel":
+        res["socket_factory"] = "ssl"
+        res["pool_factory"] = "sentinel"
     else:
         raise NotImplementedError("Not implmented connection scheme: %s" % result.scheme)
 
     if result.username:
         if result.password:
+            if res["socket_factory"] == "sentinel":
+                raise ValueError("Sentinel does not support using both a username and password")
             res["username"] = result.username
             res["password"] = result.password
         else:
-            res["password"] = result.username
+            if res["socket_factory"] == "sentinel":
+                res["sentinel_password"] = result.username
+            else:
+                res["password"] = result.username
 
     if res["socket_factory"] == "unix":
         res["address"] = result.path

@@ -16,3 +16,14 @@ class ProtocolError(RedisError):
 
 class PipelinedExceptions(RedisError):
     pass
+
+# Sentinel errors
+# TODO (design) should this inherit from CommunicationError?
+class NoReplicaFound(Exception):
+    pass
+
+class NoSentinelFound(Exception):
+    pass
+
+class NoEndpointFound(Exception):
+    pass

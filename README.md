@@ -170,7 +170,13 @@ Unix domain connection (you can use unix instead of redis-socket)
 redis-socket://[[username:]password@]path][[?option1=value1][&option2=value2]]
 ```
 
-For cluster, you can replace host:port with a list of host1:port1,host2:port2,... if you want fallback options for backup.
+Sentinel TCP connection (you must pass the group_name to check, use rediss for SSL)
+```
+redis-sentinel://[sentinel-password@]host[:port][/database]?group_name=<the sentinel group to use>[[&option1=value1][&option2=value2]]
+rediss-sentinel://[sentinel-password@]host[:port][/database]?group_name=<the sentinel group to use>[[&option1=value1][&option2=value2]]
+```
+
+For cluster or sentinel, you can replace host:port with a list of host1:port1,host2:port2,... if you want fallback options for backup.
 
 You can add options in the end from the Redis constructor options below.
 
@@ -181,6 +187,7 @@ This are the ```Redis()``` constructor options:
 pool_factory ("auto")
     "auto" / "cluster" - Try to figure out automatically what the Redis server type is (currently cluster / no-cluster)
     "pool" - Force non cluster aware connection pool (simpler code)
+    "sentinel" - Use a Redis sentinel server to check which Redis server to connect to
 address (None)
     An (address, port) tuple for tcp sockets, the default is (localhost, 6379)
     An string if it's a path for unix domain sockets, the default is "/tmp/redis.sock"
@@ -234,6 +241,14 @@ addresses (None)
     Multiple (address, port) tuples for cluster ips for fallback. The default is ((localhost, 6379), )
 ```
 
+This can be provided to the ```Redis()``` constructor if you are using the sentinel pool_factory:
+```
+addresses (None)
+    Multiple (address, port) tuples for sentinel ips for fallback. The default is ((localhost, 26379), )
+sentinel_password (None)
+    The password to authenticate the redis sentinel servers
+```
+
 This can be provided to the ```Redis()``` constructor for tcp and ssl socket_factory:
 ```
 tcp_keepalive (None)
@@ -259,13 +274,16 @@ Read the cluster and connection documentation below for the options for the ```c
 ### Exceptions
 
 ```
-ValueError - Will be thrown when an invalid input was given. Nothing will be sent to the server.
-Error - Will be thrown when the server returned an error to a request.
-PipelinedExceptions - Will be thrown when some of the pipeline failed.
-RedisError - Will be thrown when an internal logic error has happened.
-    CommunicationError - An I/O error has occured.
-    ConnectionPoolError - The connection pool could not get a new connection.
-    ProtocolError - Invalid input from the server.
+ValueError - Will be thrown when an invalid input was given. Nothing will be sent to the server
+Error - Will be thrown when the server returned an error to a request
+PipelinedExceptions - Will be thrown when some of the pipeline failed
+RedisError - Will be thrown when an internal logic error has happened
+    CommunicationError - An I/O error has occured
+    ConnectionPoolError - The connection pool could not get a new connection
+    ProtocolError - Invalid input from the server
+NoReplicaFound - An replica connection has been requested, but non has been found
+NoSentinelFound - No sentinel connection could be found to use the sentinel protocol
+NoEndpointFound - A specific endpoint that has been requested is not found
 ```
 
 ## Redis command replacements
@@ -349,17 +367,29 @@ You can also open a connection to a specific instance, for example to get key sp
 
 ### Sentinel support
 
-Currently the library supports using a SentinelConnectionPool which before establishing a new connection, it will query the sentinel instances for the current leader of the group.
+Currently the library supports using a sentinel connection pool which before establishing a new connection, it will query the sentinel instances for the current leader of the group.
 
-To connect to an sentinel group name "yey" which listens on address (), you should use the following options:
+To connect to an sentinel group name "yey" where it's instances are running on host1:port1 and host2:port2, you should use the following options:
 ```python
-FIXME r = Redis("sentinal", addresses=(('host1', port1), ('host2', port2))
+r = Redis("sentinal", addresses=(('host1', port1), ('host2', port2), group_name="yey")
 ```
 
-or via the URI:
+Or via the URI:
 ```python
-FIX MEr = Redis("redis-sentinel://localhost:26379,localhost:26380/0#mymaster")
+r = Redis.from_url("redis-sentinel://localhost:26379,localhost:26380/0?group_name=yey")
 ```
+
+You can then decide which instance you want to run on (the default is the leader of the group) by adding the endpoint argument to the command calling:
+```python
+r("get", "a", endpoint="replica")
+```
+
+or
+```python
+r("sentinel"...)
+```
+
+TODO (document) how to access only the sentinel without groups, just for administration
 
 ### RESP2 and RESP3 difference
 
