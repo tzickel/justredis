@@ -1,5 +1,6 @@
 from .connectionpool import ConnectionPool
 from .cluster import ClusterConnectionPool
+from .sentinel import SentinelConnectionPool
 from ..decoder import Error
 from ..utils import parse_url, merge_dicts
 
@@ -72,6 +73,8 @@ class Redis(ModifiedRedis):
             pool_factory = ConnectionPool
         elif pool_factory in ("auto", "cluster"):
             pool_factory = ClusterConnectionPool
+        elif pool_factory == "sentinel":
+            pool_factory = SentinelConnectionPool
         if not hasattr(pool_factory, "__call__"):
             raise AttributeError("A valid pool_factory is required, if you want to set address, use .from_url() or address=(host, port)")
         super(Redis, self).__init__(pool_factory(**kwargs), custom_command_class=custom_command_class)

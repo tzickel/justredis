@@ -38,7 +38,7 @@ class ClusterConnectionPool:
             else:
                 addresses = (("localhost", 6379),)
         elif address is not None:
-            raise ValueError("Do not provide both addresses, and address")
+            raise ValueError("Do not provide both addresses and address")
         self._initial_addresses = addresses
         self._settings = kwargs
         self._connections = {}

@@ -19,11 +19,11 @@ A Redis client for Python supporting many Redis features and Python synchronous 
 | [Pub/Sub](https://redis.io/topics/pubsub) | V | See [examples](#examples) and [Pub/Sub and monitor section](#redis-command-replacements) |
 | [Pipelining](https://redis.io/topics/pipelining) | V | See [examples](#examples) and [Pipelining section](#pipelining) |
 | [Cluster](https://redis.io/topics/cluster-spec) | V | See [Cluster commands](#cluster-commands) |
+| [Sentinel](https://redis.io/topics/sentinel) | V | See the [Sentinel support section](#sentinel-support) |
 | [RESP3 support](https://github.com/antirez/RESP3/blob/master/spec.md) | V | See [RESP2 and RESP3 difference section](#resp2-and-resp3-difference) |
 | [SSL](https://redis.io/topics/encryption) | V | See the [SSL connection parameters](#settings-options) |
 | [Script caching](https://redis.io/commands/evalsha) | X |  |
 | [Client side caching](https://redis.io/topics/client-side-caching) | X |  |
-| [Sentinel](https://redis.io/topics/sentinel) | X |  |
 
 ## Roadmap
 
@@ -346,6 +346,20 @@ r("cluster", "info", endpoint="masters")
 ```
 
 You can also open a connection to a specific instance, for example to get key space notifications or monitor it by adding ```endpoint=<the server address>``` to the ```connection()``` method).
+
+### Sentinel support
+
+Currently the library supports using a SentinelConnectionPool which before establishing a new connection, it will query the sentinel instances for the current leader of the group.
+
+To connect to an sentinel group name "yey" which listens on address (), you should use the following options:
+```python
+FIXME r = Redis("sentinal", addresses=(('host1', port1), ('host2', port2))
+```
+
+or via the URI:
+```python
+FIX MEr = Redis("redis-sentinel://localhost:26379,localhost:26380/0#mymaster")
+```
 
 ### RESP2 and RESP3 difference
 
