@@ -6,7 +6,7 @@ A Redis client for Python supporting many Redis features and Python synchronous 
 
 - Transparent API (Just call the Redis commands, and the library will figure out cluster routing, script caching, etc...)
 - Per context and command properties (database #, decoding, RESP3 attributes)
-- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio, trio and curio (using [AnyIO](https://github.com/agronholm/anyio) which needs to be installed as well if you want async I/O)
+- Asynchronous I/O support with the same exact API (but with the await keyword), targeting asyncio and trio (using [AnyIO](https://github.com/agronholm/anyio) which needs to be installed as well if you want async I/O)
 - Modular API allowing for easy support for multiple synchronous and asynchronous event loops and disabling of unneeded features
 - CI Testing for CPython 3.5, 3.6, 3.7, 3.8, 3.9 and PyPy3 with Redis 5 and Redis 6
 - No legacy support for old language features

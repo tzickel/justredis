@@ -1,9 +1,9 @@
 import anyio
 
 try:
-    anyio.create_tcp_listener
+    anyio.Lock
 except AttributeError:
-    raise AttributeError("You are using an old and incompatible AnyIO version, the minimum required version is AnyIO 2.0.0 .")
+    raise AttributeError("You are using an old and incompatible AnyIO version, the minimum required version is AnyIO 3.0.0 .")
 import socket
 import sys
 import ssl
@@ -21,7 +21,7 @@ elif sys.platform.startswith("win"):
 async def tcpsocket(address=None, connect_timeout=None, tcp_keepalive=None, tcp_nodelay=None, **kwargs):
     if address is None:
         address = ("localhost", 6379)
-    async with anyio.fail_after(connect_timeout):
+    with anyio.fail_after(connect_timeout):
         sock = await anyio.connect_tcp(address[0], address[1])
     if tcp_nodelay is not None:
         if tcp_nodelay:
@@ -44,7 +44,7 @@ async def tcpsocket(address=None, connect_timeout=None, tcp_keepalive=None, tcp_
 async def unixsocket(address=None, connect_timeout=None, **kwargs):
     if address is None:
         address = "/tmp/redis.sock"
-    async with anyio.fail_after(connect_timeout):
+    with anyio.fail_after(connect_timeout):
         sock = await anyio.connect_unix(address)
     return sock
 
@@ -85,7 +85,7 @@ class SocketWrapper:
 
     async def send(self, data):
         if self._socket_timeout:
-            async with anyio.fail_after(self._socket_timeout):
+            with anyio.fail_after(self._socket_timeout):
                 await self._socket.send(data)
         else:
             await self._socket.send(data)
@@ -96,7 +96,7 @@ class SocketWrapper:
             timeout = self._socket_timeout
         if timeout:
             try:
-                async with anyio.fail_after(timeout):
+                with anyio.fail_after(timeout):
                     return await self._socket.receive(self._buffersize)
             except TimeoutError:
                 return None
@@ -112,14 +112,14 @@ class SocketWrapper:
 
 class OurSemaphore:
     def __init__(self, value):
-        self._semaphore = anyio.create_capcity_limiter(value)
+        self._semaphore = anyio.CapacityLimiter(value)
 
-    async def release(self):
-        await self._semaphore.release()
+    def release(self):
+        self._semaphore.release()
 
     async def acquire(self, timeout=None):
         if timeout:
-            async with anyio.fail_after(timeout):
+            with anyio.fail_after(timeout):
                 await self._semaphore.acquire()
         else:
             await self._semaphore.acquire()
@@ -144,12 +144,12 @@ class AnyIOEnvironment:
 
     @staticmethod
     def lock():
-        return anyio.create_lock()
+        return anyio.Lock()
 
     # async only?
     @staticmethod
     def shield():
-        return anyio.open_cancel_scope(shield=True)
+        return anyio.CancelScope(shield=True)
 
     # async only?
     @staticmethod
