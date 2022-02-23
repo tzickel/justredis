@@ -51,7 +51,7 @@ class ConnectionPool:
                 if not conn.closed():
                     break
                 if self._limit is not None:
-                    await self._limit.release()
+                    self._limit.release()
         except IndexError:
             if self._limit is not None and not await self._limit.acquire(self._wait_timeout):
                 raise ConnectionPoolError("Could not acquire an connection form the pool")
@@ -59,13 +59,13 @@ class ConnectionPool:
                 conn = await Connection.create(**self._connection_settings)
             except Exception:
                 if self._limit is not None:
-                    await self._limit.release()
+                    self._limit.release()
                 raise
         self._connections_in_use.add(conn)
         return conn
 
     async def release(self, conn):
-        async with self._shield():
+        with self._shield():
             async with self._lock:
                 try:
                     self._connections_in_use.remove(conn)
@@ -77,7 +77,7 @@ class ConnectionPool:
                 if not conn.closed():
                     self._connections_available.append(conn)
                 elif self._limit is not None:
-                    await self._limit.release()
+                    self._limit.release()
 
     async def __call__(self, *cmd, **kwargs):
         if not cmd:
