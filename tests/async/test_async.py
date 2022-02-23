@@ -247,10 +247,10 @@ async def test_cancel(client):
     r = client
 
     async with anyio.create_task_group() as tg:
-        await tg.spawn(r, "blpop", "a", 20)
+        tg.start_soon(r, "blpop", "a", 20)
         await anyio.sleep(1)
-        await tg.cancel_scope.cancel()
+        tg.cancel_scope.cancel()
 
     await anyio.sleep(1)
     async with anyio.create_task_group() as tg:
-        await tg.spawn(r, "blpop", "a", 1)
+        tg.start_soon(r, "blpop", "a", 1)
